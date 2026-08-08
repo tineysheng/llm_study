@@ -1,0 +1,10 @@
+# 环境变量与密钥（永远不要提交 API Key）
+.env
+*.key
+
+# Go 构建产物
+/bin/
+*.exe
+
+# IDE
+.idea/
