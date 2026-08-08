@@ -31,26 +31,42 @@ func main() {
 
 	// messages 就是"对话记忆"。system 消息定义模型行为，放在最前面。
 	// 注意：随着轮次增加，这个切片会无限增长——这正是阶段 2/3 要解决的上下文管理问题。
+	systemMessage := openai.ChatCompletionMessage{
+		Role:    openai.ChatMessageRoleSystem,
+		Content: "你是一个简洁、专业的 Go 编程助手，回答时优先给出代码示例。",
+	}
 	messages := []openai.ChatCompletionMessage{
-		{
-			Role:    openai.ChatMessageRoleSystem,
-			Content: "你是一个简洁、专业的 Go 编程助手，回答时优先给出代码示例。",
-		},
+		systemMessage,
 	}
 
 	scanner := bufio.NewScanner(os.Stdin)
-	fmt.Println("聊天开始，输入 quit 退出。")
+	fmt.Println("聊天开始，输入 /help 查看命令。")
 	for {
 		fmt.Print("\n你: ")
 		if !scanner.Scan() {
+			if err := scanner.Err(); err != nil {
+				fmt.Println("读取输入出错:", err)
+			}
 			break
 		}
 		input := strings.TrimSpace(scanner.Text())
 		if input == "" {
 			continue
 		}
-		if input == "quit" {
-			break
+
+		switch input {
+		case "quit", "/exit":
+			return
+		case "/help":
+			printHelp()
+			continue
+		case "/reset":
+			messages = []openai.ChatCompletionMessage{systemMessage}
+			fmt.Println("已清空对话历史，只保留 system prompt。")
+			continue
+		case "/history":
+			printHistory(messages)
+			continue
 		}
 
 		messages = append(messages, openai.ChatCompletionMessage{
@@ -71,6 +87,29 @@ func main() {
 			Role:    openai.ChatMessageRoleAssistant,
 			Content: reply,
 		})
+	}
+}
+
+func printHelp() {
+	fmt.Println(`
+可用命令：
+  /help     查看命令说明
+  /history  查看当前对话历史
+  /reset    清空对话历史，只保留 system prompt
+  /exit     退出程序
+  quit      退出程序
+`)
+}
+
+func printHistory(messages []openai.ChatCompletionMessage) {
+	fmt.Printf("当前共有 %d 条消息：\n", len(messages))
+	for i, msg := range messages {
+		content := strings.ReplaceAll(msg.Content, "\n", " ")
+		runes := []rune(content)
+		if len(runes) > 40 {
+			content = string(runes[:40]) + "..."
+		}
+		fmt.Printf("  %d. role=%s content=%q\n", i+1, msg.Role, content)
 	}
 }
 

@@ -8,7 +8,7 @@
 2. **代码实现**：用 AI 辅助生成 Go 代码，但自己负责理解、调试和验收
 3. **面试表达**：能用自己的话讲清楚设计取舍、优化方向和工程风险
 
-详细任务和打卡记录见 [PROGRESS.md](PROGRESS.md)，概念笔记放在 [notes/](notes/)。
+详细任务和打卡记录见 [PROGRESS.md](PROGRESS.md)，概念笔记放在 [notes/](notes/)。如果开启新的 AI 会话，请先阅读 [AI_TUTORING.md](AI_TUTORING.md)，按里面的学习流程继续带我学习。
 
 ## 学习路线总览
 
