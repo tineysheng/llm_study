@@ -12,15 +12,31 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	openai "github.com/sashabaranov/go-openai"
 )
 
+type chatConfig struct {
+	model       string
+	temperature float32
+	maxTokens   int
+	timeout     time.Duration
+}
+
 func main() {
+	cfg, err := loadConfig()
+	if err != nil {
+		fmt.Println("配置错误:", err)
+		os.Exit(1)
+	}
+
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
 		fmt.Println("请先设置环境变量 OPENAI_API_KEY")
@@ -28,6 +44,7 @@ func main() {
 	}
 
 	client := openai.NewClient(apiKey)
+	fmt.Printf("当前配置：model=%s temperature=%.2f max_tokens=%d timeout=%s\n", cfg.model, cfg.temperature, cfg.maxTokens, cfg.timeout)
 
 	// messages 就是"对话记忆"。system 消息定义模型行为，放在最前面。
 	// 注意：随着轮次增加，这个切片会无限增长——这正是阶段 2/3 要解决的上下文管理问题。
@@ -60,6 +77,9 @@ func main() {
 		case "/help":
 			printHelp()
 			continue
+		case "/config":
+			printConfig(cfg)
+			continue
 		case "/reset":
 			messages = []openai.ChatCompletionMessage{systemMessage}
 			fmt.Println("已清空对话历史，只保留 system prompt。")
@@ -74,7 +94,7 @@ func main() {
 			Content: input,
 		})
 
-		reply, err := streamChat(client, messages)
+		reply, err := streamChat(client, messages, cfg)
 		if err != nil {
 			fmt.Println("调用出错:", err)
 			// 请求失败时把刚才那条 user 消息弹掉，避免历史里留下没有回复的消息
@@ -90,15 +110,94 @@ func main() {
 	}
 }
 
+func loadConfig() (chatConfig, error) {
+	defaultModel := getEnvString("OPENAI_MODEL", openai.GPT4oMini)
+	defaultTemperature, err := getEnvFloat32("OPENAI_TEMPERATURE", 0.7)
+	if err != nil {
+		return chatConfig{}, err
+	}
+	defaultMaxTokens, err := getEnvInt("OPENAI_MAX_TOKENS", 800)
+	if err != nil {
+		return chatConfig{}, err
+	}
+	defaultTimeoutSeconds, err := getEnvInt("OPENAI_TIMEOUT_SECONDS", 60)
+	if err != nil {
+		return chatConfig{}, err
+	}
+
+	model := flag.String("model", defaultModel, "model name, for example gpt-4o-mini")
+	temperature := flag.Float64("temperature", float64(defaultTemperature), "sampling temperature, range 0-2")
+	maxTokens := flag.Int("max-tokens", defaultMaxTokens, "maximum output tokens")
+	timeoutSeconds := flag.Int("timeout-seconds", defaultTimeoutSeconds, "request timeout in seconds")
+	flag.Parse()
+
+	if *model == "" {
+		return chatConfig{}, errors.New("model 不能为空")
+	}
+	if *temperature < 0 || *temperature > 2 {
+		return chatConfig{}, errors.New("temperature 必须在 0 到 2 之间")
+	}
+	if *maxTokens <= 0 {
+		return chatConfig{}, errors.New("max-tokens 必须大于 0")
+	}
+	if *timeoutSeconds <= 0 {
+		return chatConfig{}, errors.New("timeout-seconds 必须大于 0")
+	}
+
+	return chatConfig{
+		model:       *model,
+		temperature: float32(*temperature),
+		maxTokens:   *maxTokens,
+		timeout:     time.Duration(*timeoutSeconds) * time.Second,
+	}, nil
+}
+
+func getEnvString(key, fallback string) string {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+	return value
+}
+
+func getEnvFloat32(key string, fallback float32) (float32, error) {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := strconv.ParseFloat(value, 32)
+	if err != nil {
+		return 0, fmt.Errorf("%s 必须是数字: %w", key, err)
+	}
+	return float32(parsed), nil
+}
+
+func getEnvInt(key string, fallback int) (int, error) {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, fmt.Errorf("%s 必须是整数: %w", key, err)
+	}
+	return parsed, nil
+}
+
 func printHelp() {
 	fmt.Println(`
 可用命令：
-  /help     查看命令说明
-  /history  查看当前对话历史
-  /reset    清空对话历史，只保留 system prompt
-  /exit     退出程序
-  quit      退出程序
+	/help     查看命令说明
+	/config   查看当前模型参数
+	/history  查看当前对话历史
+	/reset    清空对话历史，只保留 system prompt
+	/exit     退出程序
+	quit      退出程序
 `)
+}
+
+func printConfig(cfg chatConfig) {
+	fmt.Printf("model=%s temperature=%.2f max_tokens=%d timeout=%s\n", cfg.model, cfg.temperature, cfg.maxTokens, cfg.timeout)
 }
 
 func printHistory(messages []openai.ChatCompletionMessage) {
@@ -114,15 +213,19 @@ func printHistory(messages []openai.ChatCompletionMessage) {
 }
 
 // streamChat 发起流式请求并边收边打印，返回拼接后的完整回复。
-func streamChat(client *openai.Client, messages []openai.ChatCompletionMessage) (string, error) {
+func streamChat(client *openai.Client, messages []openai.ChatCompletionMessage, cfg chatConfig) (string, error) {
 	req := openai.ChatCompletionRequest{
-		Model:       openai.GPT4oMini, // 学习阶段用 mini，成本几乎可忽略
+		Model:       cfg.model,
 		Messages:    messages,
-		Temperature: 0.7, // 0 最确定，2 最发散，改改它观察区别（任务 1.5）
+		Temperature: cfg.temperature,
+		MaxTokens:   cfg.maxTokens,
 		Stream:      true,
 	}
 
-	stream, err := client.CreateChatCompletionStream(context.Background(), req)
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.timeout)
+	defer cancel()
+
+	stream, err := client.CreateChatCompletionStream(ctx, req)
 	if err != nil {
 		return "", err
 	}

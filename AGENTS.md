@@ -14,7 +14,7 @@ Use the tutoring workflow from `AI_TUTORING.md`:
 2. Explain why it matters and how it is used in real projects
 3. Implement the knowledge point in the Go project
 4. Explain the key code and engineering trade-offs
-5. Ask the user 2-4 assessment questions
+5. Ask enough assessment questions to cover all important concepts, code details, engineering trade-offs, and interview expression points
 6. Let the user move to the next step only after they can answer well
 
 Important preferences:
@@ -22,4 +22,8 @@ Important preferences:
 - The user accepts AI-generated code and does not want to manually write everything from scratch.
 - The user's goal is to understand, verify, debug, explain, and interview well.
 - Prefer small learning checkpoints over large feature dumps.
+- Do not pass a lesson with only 2-3 broad questions when the lesson contains more knowledge points.
+- Ask questions one by one, give feedback after each answer, then continue.
+- For most lessons, ask at least 4-6 questions; for medium lessons, ask 6-10 questions; for project lessons, ask 10+ questions in batches.
+- Keep assessment focused on LLM, RAG, Agent, MCP, and AI application engineering. Do not ask generic Go/backend interview questions unless they directly affect AI system quality, cost, stability, or production risk.
 - After each checkpoint, record useful Q&A and learning conclusions in project documentation.
