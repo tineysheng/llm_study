@@ -11,6 +11,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -28,6 +29,14 @@ type chatConfig struct {
 	temperature float32
 	maxTokens   int
 	timeout     time.Duration
+}
+
+type learningCard struct {
+	Title      string   `json:"title"`
+	Summary    string   `json:"summary"`
+	Keywords   []string `json:"keywords"`
+	Difficulty string   `json:"difficulty"`
+	NextAction string   `json:"next_action"`
 }
 
 func main() {
@@ -68,6 +77,22 @@ func main() {
 		}
 		input := strings.TrimSpace(scanner.Text())
 		if input == "" {
+			continue
+		}
+
+		if strings.HasPrefix(input, "/json ") {
+			topic := strings.TrimSpace(strings.TrimPrefix(input, "/json "))
+			if topic == "" {
+				fmt.Println("用法：/json 你想总结的主题")
+				continue
+			}
+			card, raw, err := generateLearningCard(client, cfg, topic)
+			if err != nil {
+				fmt.Println("结构化输出解析失败:", err)
+				fmt.Println("模型原始输出:", raw)
+				continue
+			}
+			printLearningCard(card)
 			continue
 		}
 
@@ -190,6 +215,7 @@ func printHelp() {
 	/help     查看命令说明
 	/config   查看当前模型参数
 	/history  查看当前对话历史
+	/json     生成结构化 JSON 学习卡片，例如：/json Go channel
 	/reset    清空对话历史，只保留 system prompt
 	/exit     退出程序
 	quit      退出程序
@@ -198,6 +224,15 @@ func printHelp() {
 
 func printConfig(cfg chatConfig) {
 	fmt.Printf("model=%s temperature=%.2f max_tokens=%d timeout=%s\n", cfg.model, cfg.temperature, cfg.maxTokens, cfg.timeout)
+}
+
+func printLearningCard(card learningCard) {
+	fmt.Println("结构化学习卡片：")
+	fmt.Println("标题:", card.Title)
+	fmt.Println("摘要:", card.Summary)
+	fmt.Println("关键词:", strings.Join(card.Keywords, "、"))
+	fmt.Println("难度:", card.Difficulty)
+	fmt.Println("下一步:", card.NextAction)
 }
 
 func printHistory(messages []openai.ChatCompletionMessage) {
@@ -210,6 +245,54 @@ func printHistory(messages []openai.ChatCompletionMessage) {
 		}
 		fmt.Printf("  %d. role=%s content=%q\n", i+1, msg.Role, content)
 	}
+}
+
+func generateLearningCard(client *openai.Client, cfg chatConfig, topic string) (learningCard, string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.timeout)
+	defer cancel()
+
+	req := openai.ChatCompletionRequest{
+		Model:       cfg.model,
+		Temperature: 0.2,
+		MaxTokens:   cfg.maxTokens,
+		Messages: []openai.ChatCompletionMessage{
+			{
+				Role: openai.ChatMessageRoleSystem,
+				Content: `你是一个严格的 JSON 生成器。只返回 JSON，不要返回 Markdown，不要返回代码块。
+JSON 必须包含这些字段：
+{
+  "title": "string",
+  "summary": "string",
+  "keywords": ["string"],
+  "difficulty": "beginner|intermediate|advanced",
+  "next_action": "string"
+}`,
+			},
+			{
+				Role:    openai.ChatMessageRoleUser,
+				Content: "请把这个学习主题整理成结构化学习卡片：" + topic,
+			},
+		},
+	}
+
+	resp, err := client.CreateChatCompletion(ctx, req)
+	if err != nil {
+		return learningCard{}, "", err
+	}
+	if len(resp.Choices) == 0 {
+		return learningCard{}, "", errors.New("模型没有返回 choices")
+	}
+
+	raw := strings.TrimSpace(resp.Choices[0].Message.Content)
+	var card learningCard
+	if err := json.Unmarshal([]byte(raw), &card); err != nil {
+		return learningCard{}, raw, err
+	}
+	if card.Title == "" || card.Summary == "" || len(card.Keywords) == 0 || card.Difficulty == "" || card.NextAction == "" {
+		return learningCard{}, raw, errors.New("JSON 字段不完整")
+	}
+
+	return card, raw, nil
 }
 
 // streamChat 发起流式请求并边收边打印，返回拼接后的完整回复。

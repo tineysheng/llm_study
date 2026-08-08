@@ -26,4 +26,5 @@ Important preferences:
 - Ask questions one by one, give feedback after each answer, then continue.
 - For most lessons, ask at least 4-6 questions; for medium lessons, ask 6-10 questions; for project lessons, ask 10+ questions in batches.
 - Keep assessment focused on LLM, RAG, Agent, MCP, and AI application engineering. Do not ask generic Go/backend interview questions unless they directly affect AI system quality, cost, stability, or production risk.
+- Make assessments market-interview-oriented. The user's goal is to get an LLM / AI Agent / AI application engineering job, so questions should reflect common real interview topics: RAG design and evaluation, Agent tool calling, token cost, context window, prompt engineering, structured output, observability, safety, and project storytelling.
 - After each checkpoint, record useful Q&A and learning conclusions in project documentation.

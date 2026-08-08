@@ -188,3 +188,160 @@ go run ./01-llm-basics -temperature 1.5
 - `max_tokens` 为什么能控制成本和输出风险
 - timeout 为什么是后端服务调用外部 API 的必要保护
 - model 选择如何影响 AI 应用的效果、成本和稳定性
+
+## 第三关学习记录：结构化输出
+
+### 核心结论
+
+业务系统通常不能只依赖自然语言回答，因为自然语言适合人读，但不适合程序稳定解析。结构化输出让模型按固定 JSON 字段返回结果，Go 程序可以用 `encoding/json` 解析成结构体，再进入后续业务流程。
+
+### 项目实现
+
+`01-llm-basics/main.go` 新增了 `/json <主题>` 命令。
+
+示例：
+
+```text
+/json RAG 是什么
+```
+
+模型需要返回类似下面的 JSON：
+
+```json
+{
+  "title": "RAG 是什么",
+  "summary": "RAG 是一种把检索结果提供给大模型，再让模型基于上下文生成答案的方法。",
+  "keywords": ["RAG", "Embedding", "向量检索"],
+  "difficulty": "beginner",
+  "next_action": "学习 Embedding 和 Top-K 检索"
+}
+```
+
+Go 代码中的关键结构：
+
+```go
+type learningCard struct {
+	Title      string   `json:"title"`
+	Summary    string   `json:"summary"`
+	Keywords   []string `json:"keywords"`
+	Difficulty string   `json:"difficulty"`
+	NextAction string   `json:"next_action"`
+}
+```
+
+### 工程风险
+
+即使 Prompt 要求“只返回 JSON”，模型仍可能返回 Markdown、解释文字、字段缺失或非法 JSON。所以代码必须：
+
+- 用 `json.Unmarshal` 显式解析
+- 检查关键字段是否为空
+- 解析失败时打印原始输出，方便定位问题
+
+### 当前状态
+
+本关已收束。
+
+### 学习过程中的关键问题
+
+**问题 1：为什么业务系统不能只依赖自然语言文本？**
+
+答案：自然语言适合人读，但格式不稳定、字段不固定、难以校验。业务系统需要稳定的数据结构，JSON 可以被解析成 Go struct，方便后续业务流程使用。
+
+**问题 2：`learningCard` 结构体的作用是什么？**
+
+答案：它是业务侧的数据契约。模型返回的字符串只有被成功解析进结构体，程序才知道字段是否存在、类型是否正确，也才能继续入库、展示或传给其他模块。
+
+**学习反馈：不要把明显问题变成八股追问。**
+
+答案：考核应聚焦真实 AI 工程问题。如果用户已经掌握核心动机和实现关系，应及时收束，不要为了问题数量继续重复追问。
+
+## 阶段 1 小结：LLM API 基础
+
+### 本阶段项目能力
+
+`01-llm-basics` 已经从一个简单的流式聊天 CLI，演进成一个包含基础 LLM 工程能力的小 demo：
+
+- 多轮对话：用 `messages` 保存 system、user、assistant 历史
+- 流式输出：用 stream 逐块接收模型 delta，提升交互体验
+- 命令系统：支持 `/help`、`/history`、`/reset`、`/config`、`/json`
+- 参数配置：支持 model、temperature、max tokens、timeout
+- 结构化输出：支持让模型返回 JSON，并解析成 Go struct
+- 错误处理：API 失败时回滚 user 消息，JSON 解析失败时打印原始输出
+
+### 建议运行验收
+
+运行：
+
+```powershell
+go run ./01-llm-basics -temperature 0.2 -max-tokens 500
+```
+
+进入 CLI 后依次测试：
+
+```text
+/config
+/history
+你好，我叫张三
+/history
+/json RAG 是什么
+/reset
+/history
+/exit
+```
+
+观察重点：
+
+- `/config` 是否显示当前模型参数
+- 第一次 `/history` 是否只有 system 消息
+- 普通对话后 `/history` 是否新增 user 和 assistant 消息
+- `/json` 是否能输出结构化学习卡片
+- `/reset` 后是否只剩 system 消息
+
+### 面试版表达
+
+如果面试官问：“你做过 LLM API 调用吗？怎么理解多轮对话？”
+
+可以这样回答：
+
+> 我用 Go 实现过一个 LLM 流式聊天 CLI。这个 demo 里我重点理解了 LLM API 的无状态特性：模型不会自动保存会话历史，所以应用层要维护 `messages`，并在每次请求时把 system、user、assistant 消息传给模型。为了让体验更好，我使用 streaming 接收增量 delta，实现类似打字机的输出效果。后面我还加了 `/history` 和 `/reset`，用来观察和控制上下文。
+
+如果面试官问：“你怎么控制 LLM 应用的成本和稳定性？”
+
+可以这样回答：
+
+> 我会从模型选择、上下文长度、输出长度和超时控制几个方面处理。简单任务用小模型，复杂任务再切到强模型；多轮对话要控制历史长度，否则输入 token 会越来越多；`max_tokens` 可以限制输出上限；temperature 低一些可以提高代码、JSON、事实类任务的稳定性；后端调用外部 LLM API 必须设置 timeout，避免请求长时间阻塞。
+
+如果面试官问：“结构化输出有什么用？”
+
+可以这样回答：
+
+> 自然语言适合人读，但业务系统需要稳定的数据结构。我在 demo 里加了 `/json` 命令，让模型按固定 JSON 字段返回学习卡片，然后用 Go 的 `encoding/json` 解析成 struct。这样程序才能可靠访问字段、校验格式，并把结果用于入库、展示或后续工作流。不过模型仍可能返回非法 JSON，所以代码必须处理解析失败并保留原始输出用于排查。
+
+### 阶段 1 到阶段 2 的连接
+
+阶段 1 解决的是“如何可靠调用 LLM”。阶段 2 的 RAG 会在这个基础上加入“如何给 LLM 提供外部知识”。
+
+连接关系：
+
+- 阶段 1 的 `messages` 是 RAG 拼 prompt 的基础
+- 阶段 1 的 `max_tokens` 会影响 RAG 能塞多少上下文
+- 阶段 1 的结构化输出可用于 RAG 返回引用来源
+- 阶段 1 的 timeout 和错误处理会继续用于 Embedding、检索和生成链路
+
+### 阶段 1 总考核结论
+
+阶段 1 已完成。当前 demo 是 LLM API 基础练习，不适合单独写进简历，但适合作为后续 RAG 和 Agent 项目的基础。
+
+已掌握：
+
+- LLM API 无状态，多轮对话由应用层维护 `messages`
+- `system` 是系统指令，不是会话标题
+- 历史越长，输入 token 越多，成本和延迟越高
+- streaming 主要改善用户等待体验，不会让模型本身更聪明
+- 结构化输出需要 prompt 约束、低 temperature、Go 侧 JSON 解析和错误处理
+
+后续需要加强：
+
+- Prompt 设计
+- RAG 检索增强生成
+- Agent 工具调用
