@@ -56,10 +56,10 @@
 
 ### 2.2 文档处理
 
-- [ ] 读取本地 Markdown 文档
-- [ ] 实现按标题或固定长度切分 chunk
-- [ ] 给每个 chunk 保存 source、title、content、index 等元数据
-- [ ] 对比不同 chunk 大小对检索效果的影响
+- [x] 读取本地 Markdown 文档
+- [x] 实现按标题或固定长度切分 chunk
+- [x] 给每个 chunk 保存 source、title、content、index 等元数据
+- [x] 对比不同 chunk 大小对检索效果的影响
 
 ### 2.3 向量存储
 

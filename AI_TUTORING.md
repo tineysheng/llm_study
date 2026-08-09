@@ -923,3 +923,91 @@ AI 反馈：
 ### 下一步
 
 进入文档处理：读取本地 Markdown 文档，把长文档切成 chunk，并为每个 chunk 保存 source、title、content、index 等元数据。
+
+## 文档处理课程记录：Markdown 读取与 chunk 切分
+
+### 本课知识点
+
+文档处理是 RAG 建库的第一步。真实 RAG 不会把整篇文档直接塞给模型，而是先切成 chunk，并为每个 chunk 保存 metadata。
+
+本课重点：
+
+- Markdown 是适合学习 RAG 的纯文本知识库格式
+- chunk 是后续 Embedding 和检索的基本单位
+- metadata 包括 source、title、index、content，用于来源引用和问题排查
+- 按标题切分能保留语义结构，但 chunk 大小不稳定
+- 固定长度切分大小稳定，但可能切断句子、代码块或表格
+- chunk 太大容易带入无关内容，chunk 太小可能缺少上下文
+
+### 项目落地
+
+已新增：
+
+- `notes/05-document-processing.md`：文档处理术语、切分策略、输出解释和常见误区
+- `02-rag/chunk-demo/main.go`：读取 Markdown，支持 `heading` 和 `fixed` 两种切分策略
+
+运行方式：
+
+```powershell
+go run .\02-rag\chunk-demo -mode heading
+go run .\02-rag\chunk-demo -mode fixed -chunk-size 500
+```
+
+### 运行观察
+
+用户运行按标题切分：
+
+- 初始输出出现了只有标题、没有正文的低质量 chunk
+- 已改进代码：跳过只有标题没有正文的 chunk
+- 改进后 `notes\02-rag-basics.md` 被切成 23 个 heading chunk
+
+用户运行固定长度切分：
+
+- `chunk-size=500` 时切出 10 个 chunk
+- 每个 chunk 大小更稳定
+- 但 Chunk #3 从代码片段中间开始，说明固定长度切分可能破坏语义结构
+
+### 本课问答记录
+
+**问题 1：按标题切分和固定长度切分各有什么优点和问题？**
+
+用户回答：
+
+> 按标题切，chunk的内容大小差别比较大。按固定长度切，虽然处理的内容长度的问题，但是可以会有内容不全的问题
+
+AI 反馈：
+
+> 回答正确。按标题切分语义结构更完整，但 chunk 大小不稳定；固定长度切分大小稳定，但可能从句子、代码块、表格中间切开，导致上下文不完整。
+
+**问题 2：为什么每个 chunk 不能只保存 content，还要保存 source、title、index 这些 metadata？**
+
+用户回答：
+
+> 因为最终的答案，需要回答来源于哪里
+
+AI 反馈：
+
+> 回答正确。metadata 用于来源引用、错误排查和前端展示。向量库里不能只存 embedding，也要存 source、title、index、content 等元数据。
+
+**问题 3：chunk 太大或太小分别会造成什么影响？**
+
+用户回答：
+
+> 太大可能会有无效信息，浪费金钱。太小可能会内容不全
+
+AI 反馈：
+
+> 回答正确。chunk 太大容易带入无关内容，增加 token 成本和延迟，也可能污染上下文；chunk 太小可能缺少必要上下文，导致检索到了片段也无法回答完整问题。
+
+### 本课通过标准
+
+本课已通过。用户应能解释：
+
+- 为什么 RAG 要把文档切成 chunk
+- metadata 为什么重要
+- 标题切分和固定长度切分的取舍
+- chunk size 如何影响成本、召回、噪声和上下文完整性
+
+### 下一步
+
+进入内存向量库：把 chunk 和向量保存到内存结构里，支持 Top-K 相似度检索。
