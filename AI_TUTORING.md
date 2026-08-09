@@ -1011,3 +1011,108 @@ AI 反馈：
 ### 下一步
 
 进入内存向量库：把 chunk 和向量保存到内存结构里，支持 Top-K 相似度检索。
+
+## 内存向量库课程记录：写入 chunk 并做 Top-K 检索
+
+### 本课知识点
+
+向量库负责保存 chunk 的 embedding、content 和 metadata，并在查询时根据用户问题向量返回最相关的 Top-K chunk。
+
+本课重点：
+
+- 向量库不能只存 vector，还要存 content 和 metadata
+- content 用于后续拼 Prompt
+- metadata 用于来源引用、前端展示和问题排查
+- 内存向量库适合学习和小数据量，不适合大规模生产
+- 本课使用暴力检索：遍历所有向量，计算相似度，排序后返回 Top-K
+- Top-K 越大，召回更多，但也更容易带入弱相关或无关 chunk
+
+### 项目落地
+
+已新增：
+
+- `notes/06-vector-store.md`：向量库术语、Top-K 检索、暴力检索和常见误区
+- `02-rag/vector-store-demo/main.go`：内存向量库，支持写入 chunk 向量和 Top-K 检索
+
+运行方式：
+
+```powershell
+go run .\02-rag\vector-store-demo
+go run .\02-rag\vector-store-demo -top-k 3
+```
+
+### 运行观察
+
+用户运行默认 `top-k=2`：
+
+```text
+1. score=0.994 title=API Key 配置
+2. score=0.518 title=RAG 和微调的区别
+```
+
+说明最相关的 API Key chunk 排第一，第二条已经弱相关。
+
+用户运行 `top-k=3`：
+
+```text
+1. score=0.994 title=API Key 配置
+2. score=0.518 title=RAG 和微调的区别
+3. score=0.226 title=JSON 结构化输出
+```
+
+说明 Top-K 增大后会召回更多 chunk，但第 2、3 条和问题“怎么设置 OpenAI API Key？”弱相关或无关，可能污染 Prompt。
+
+### 本课问答记录
+
+**问题 1：内存向量库里每条记录为什么不能只存 vector，还要存 content 和 metadata？**
+
+用户回答：
+
+> 因为回答用户问题后要说明来源
+
+AI 反馈：
+
+> 回答正确。补充：vector 只用于相似度检索，content 用于拼 Prompt，source/title/index 用于来源引用和问题排查。
+
+**问题 2：Top-K 变大有什么好处和风险？**
+
+用户回答：
+
+> 上下文会更完整，但是有可能是垃圾信息
+
+AI 反馈：
+
+> 回答正确。Top-K 变大可以召回更多候选 chunk，降低漏掉答案的概率；但也会带入弱相关或无关 chunk，增加 token 成本和延迟，并可能导致模型答偏。
+
+**问题 3：为什么内存暴力检索适合学习和小数据量，但不适合大规模生产？**
+
+用户回答：
+
+> 感觉是每次都要遍历计算两个向量的相似度，计算量估计会特别的大
+
+AI 反馈：
+
+> 回答正确。暴力检索每次查询都要和所有向量计算相似度，时间复杂度接近 O(n)。生产大规模 RAG 通常使用向量数据库和索引结构，例如 HNSW。
+
+**问题 4：如果面试官问“RAG 系统里的向量库负责什么”，怎么回答？**
+
+用户回答：
+
+> 负责保存向量数据，包括内容、标题、原路径等
+
+AI 反馈：
+
+> 方向正确。标准表达：向量库负责保存每个 chunk 的 embedding、content 和 metadata，并在查询时根据用户问题向量做 Top-K 相似度检索，返回最相关的 chunk。content 用来拼 Prompt，metadata 用来做来源引用和排查问题。
+
+### 本课通过标准
+
+本课已通过。用户应能解释：
+
+- 向量库存储 embedding、content 和 metadata
+- Top-K 检索的输入、排序和输出
+- 为什么 Top-K 不是越大越好
+- 内存暴力检索和真实向量数据库的区别
+
+### 下一步
+
+进入 RAG 问答链路：把“问题 -> 向量检索 -> Top-K chunk -> Prompt 拼接 -> 回答”串成一个最小闭环。真实向量数据库 Qdrant/pgvector 暂时后置。
