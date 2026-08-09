@@ -1116,3 +1116,107 @@ AI 反馈：
 ### 下一步
 
 进入 RAG 问答链路：把“问题 -> 向量检索 -> Top-K chunk -> Prompt 拼接 -> 回答”串成一个最小闭环。真实向量数据库 Qdrant/pgvector 暂时后置。
+
+## RAG 问答链路课程记录：从问题到带来源答案
+
+### 本课知识点
+
+本课把前面几课串成最小 RAG 闭环：
+
+```text
+用户问题 -> query embedding -> Top-K 检索 -> Prompt 拼接 -> 基于上下文回答 -> 输出来源
+```
+
+本课重点：
+
+- Retrieval 负责从向量库找候选 chunk
+- Context 是拼进 Prompt 给模型参考的检索结果
+- Prompt Assembly 把系统规则、上下文和用户问题组织成模型输入
+- Grounded Answer 要求答案基于上下文
+- Citation 用于来源引用和错误排查
+- Score Threshold 用于判断上下文是否足够相关，不相关时应说不知道
+
+### 项目落地
+
+已新增：
+
+- `notes/07-rag-chain.md`：RAG 问答链路术语、输出解释和常见误区
+- `02-rag/rag-chain-demo/main.go`：mock RAG 闭环，支持 Top-K、Prompt 拼接、来源引用和不知道场景
+
+运行方式：
+
+```powershell
+go run .\02-rag\rag-chain-demo
+go run .\02-rag\rag-chain-demo -question "Go goroutine 怎么调度？"
+```
+
+### 运行观察
+
+用户运行默认问题“怎么设置 OpenAI API Key？”：
+
+- query vector 命中 API Key 配置
+- Top-1 score=0.994，高于 threshold=0.75
+- Prompt 中包含 Top-K context
+- 最终回答使用 API Key chunk，并输出来源：`notes\01-core-concepts.md / API Key 配置 / chunk #1`
+
+用户运行未知问题“Go goroutine 怎么调度？”：
+
+- Top-K 仍返回相对最高的 Streaming 和 JSON chunk
+- 但 Top-1 score=-0.055，低于 threshold=0.75
+- 最终回答：`根据当前知识库上下文，我不知道答案。`
+
+这说明 Top-K 总会返回“相对最接近”的候选，但不代表候选一定能回答问题。
+
+### 本课问答记录
+
+**问题 1：为什么 RAG 不是“只要检索到 chunk 就回答”，而是还要看相似度阈值或上下文是否足够相关？**
+
+用户回答：
+
+> 这样回答不好，因为chunk里面可能会有更好的答案，你不能随便整个问题答案
+
+AI 反馈：
+
+> 方向是对的：不能随便拿 chunk 回答。更准确地说，Top-K 永远会返回相对最接近的几个 chunk，即使它们整体都不相关。低于阈值时应说不知道，避免模型基于无关内容硬编。
+
+**重复问题反馈**
+
+AI 追问了“为什么 Prompt 里要拼 source/title/index/content”，用户指出这个问题已经问太多次。后续应避免重复考 metadata 来源引用问题，除非进入新的工程场景。
+
+**问题 2：为什么真实 RAG 不能直接把 Top-K 结果原样返回给用户，而还需要 Chat Model 基于 Prompt 生成答案？**
+
+用户回答：
+
+> Top-K的数据是文档信息，Chat的回答才是最终的答案
+
+AI 反馈：
+
+> 回答正确。Top-K 返回的是候选资料，不是面向用户的最终表达。Chat Model 的作用是把检索资料组织成自然语言答案，并按 Prompt 规则控制边界。
+
+**问题 3：如果面试官让你用一句话讲清楚 RAG 的完整链路，你会怎么说？**
+
+用户回答：
+
+> chunk里面保存了文档信息，embedding可以把文本信息转成向量和计算向量余弦相识度，top-k可以获取到向量相识的前几名文档给到chat ai，chat ai根据上下文计算出最终答案
+
+AI 反馈：
+
+> 链路已经串起来了，但需修正：Embedding 负责把文本转向量，相似度通常由代码或向量库计算；Chat Model 是基于上下文生成答案，不是“计算出答案”。
+
+标准表达：
+
+> RAG 会先把用户问题转成 query embedding，到向量库里做 Top-K 相似度检索，取出最相关的 chunk 和 metadata，再把这些上下文拼进 Prompt，让 Chat Model 基于上下文生成答案并返回引用来源；如果上下文不相关，就明确说不知道。
+
+### 本课通过标准
+
+本课已通过。用户应能解释：
+
+- RAG 问答链路不是一次模型调用，而是检索和生成的组合
+- Top-K 结果是候选上下文，不是最终答案
+- Prompt 拼接用于约束模型只基于上下文回答
+- 阈值可以避免无关上下文导致模型硬答
+- 最终答案应带引用来源；无答案时应明确说不知道
+
+### 下一步
+
+进入 RAG 调优与面试准备：调整 Top-K、观察噪声变化，对比无 RAG 和有 RAG 的效果，总结召回失败、上下文污染、幻觉和引用错误。
