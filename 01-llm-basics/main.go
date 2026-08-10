@@ -210,7 +210,7 @@ func getEnvInt(key string, fallback int) (int, error) {
 }
 
 func printHelp() {
-	fmt.Println(`
+	fmt.Print(`
 可用命令：
 	/help     查看命令说明
 	/config   查看当前模型参数
