@@ -220,4 +220,3 @@ Go 程序真正执行工具，例如计算：
 - Go 程序负责解析参数、校验参数、执行工具和处理错误
 - 工具调用让 LLM 能使用外部确定性能力
 - Function Calling 是 Agent Loop 的基础，不等于完整 Agent
-
