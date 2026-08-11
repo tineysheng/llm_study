@@ -1362,3 +1362,59 @@ AI 记录：
 
 阶段 2 RAG 主线已完成基础闭环和调优入门。下一课进入阶段 3：Function Calling 与 AI Agent，重点学习 tool schema / function schema 的作用，以及模型如何决定调用工具。
 
+## Function Calling 第一课记录：工具调用最小闭环（进行中）
+
+### 本课知识点
+
+本课进入阶段 3：Function Calling 与 AI Agent。目标是把模型从“只生成文本”升级为“可以请求应用程序调用外部工具”。
+
+本课重点：
+
+- `Tool / Function`：应用程序提供给模型使用的外部能力
+- `Tool Schema / Function Schema`：工具说明书，描述工具名、用途、参数类型和必填字段
+- `Tool Call`：模型返回的结构化工具调用请求，包括工具名和 JSON 参数
+- `Tool Result / Observation`：Go 程序执行工具后的结果
+- 模型不会直接执行工具，真正执行工具的是应用程序
+- Go 侧必须解析参数、校验参数、处理工具错误
+
+### 项目落地
+
+已新增：
+
+- `notes/09-function-calling-basics.md`：Function Calling 术语、输出解释和常见误区
+- `03-agent/main.go`：mock Function Calling 最小闭环
+- `03-agent/main_test.go`：计算表达式解析、参数解析、工具执行和错误处理测试
+- `03-agent/README.md`：第三阶段 Agent 模块说明
+- `03-agent/DESIGN.md`：当前设计目标、取舍和安全边界
+
+当前 demo 注册了一个 `calculator` 工具：
+
+```text
+用户问题 -> mock model 判断是否需要工具 -> tool call -> Go 解析 JSON 参数 -> 执行 calculator -> 输出 final answer
+```
+
+### 运行方式
+
+```powershell
+go run .\03-agent
+go run .\03-agent -question "请计算 12 + 30"
+go run .\03-agent -question "你好，介绍一下 Function Calling"
+go run .\03-agent -question "请计算 8 / 0"
+go test .\03-agent
+```
+
+### 当前验证结果
+
+AI 已验证：
+
+- `go test .\03-agent` 通过
+- 默认问题“请计算 12 + 30”会触发 `calculator` tool call，并得到 `42`
+- 非计算问题不会调用工具，会直接回答 Function Calling 的说明
+- “请计算 8 / 0”会触发工具错误：`除数不能为 0`
+- 新模块安全扫描通过：Critical/High/Medium/Low 均为 0
+- 新模块完整性扫描通过：`README.md`、`DESIGN.md` 和代码结构通过校验
+
+### 下一步
+
+进入本课问答。考核应重点覆盖：Tool Schema 的作用、模型和应用程序的职责边界、为什么 Go 侧必须做参数校验、Function Calling 和完整 Agent Loop 的区别。
+

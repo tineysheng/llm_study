@@ -91,10 +91,11 @@
 
 ### 3.1 Function Calling 基础
 
+- 本课材料已新增：`notes/09-function-calling-basics.md`、`03-agent/main.go`、`03-agent/main_test.go`、`03-agent/README.md`、`03-agent/DESIGN.md`。当前使用 mock model 学习工具调用闭环。
 - [ ] 理解 tool schema / function schema 的作用
-- [ ] 注册第一个工具：计算器或假天气查询
-- [ ] 让模型根据用户问题决定是否调用工具
-- [ ] 解析模型返回的工具名和参数
+- [x] 注册第一个工具：计算器或假天气查询（已注册 `calculator`）
+- [x] 让模型根据用户问题决定是否调用工具（mock model 已实现）
+- [x] 解析模型返回的工具名和参数（已解析 tool call JSON arguments）
 
 ### 3.2 Tool 抽象
 
