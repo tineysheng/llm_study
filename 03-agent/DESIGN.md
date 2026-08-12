@@ -4,18 +4,18 @@
 
 阶段 3 的目标是把 LLM 应用从普通聊天扩展为可以调用工具的 Agent。
 
-第一课只实现最小 Function Calling 闭环：
+当前版本在最小 Function Calling 闭环基础上，增加了 LLM Tool Choice 实验能力：
 
 ```text
-用户问题 -> 模型决定是否调用工具 -> tool call -> Go 执行工具 -> tool result -> 最终回答
+工具 schema + system prompt + 用户问题 -> 模型决定是否调用工具 -> tool call -> ToolRegistry 分发 -> Go 执行工具 -> tool result -> 最终回答
 ```
+
+`Tool` 接口和 `ToolRegistry` 仍然存在，但它们只是实验支架。课程重点是观察 LLM 如何根据工具说明选择工具，而不是背诵接口设计。
 
 ## 非目标
 
 当前版本暂不实现：
 
-- 真实 LLM Function Calling API
-- 多工具 Agent Loop
 - 文件读取工具
 - MCP Server
 - 多轮规划和反思
@@ -27,6 +27,29 @@
 ### Tool Schema
 
 `ToolSchema` 描述工具名称、用途和参数结构。它的作用是让模型知道有哪些工具可以用，以及参数应该如何组织。
+
+### Tool Interface
+
+`Tool` 是 Go 侧的统一工具接口：
+
+```go
+type Tool interface {
+	Schema() ToolSchema
+	Execute(rawArguments string) (ToolResult, error)
+}
+```
+
+每个工具必须同时提供 schema 和 execute，避免“模型看到的参数说明”和“Go 实际解析的参数”脱节。
+
+### Tool Registry
+
+`ToolRegistry` 保存工具名到工具实现的映射。它负责：
+
+- 注册工具
+- 拒绝重复工具名
+- 输出所有工具 schema
+- 根据 `ToolCall.Name` 分发到具体工具
+- 拒绝未知工具
 
 ### Tool Call
 
@@ -40,7 +63,20 @@
 `mockModelDecision` 用确定性规则模拟模型选择工具：
 
 - 如果问题里包含简单数学表达式，就请求 `calculator`
+- 如果问题询问当前时间，就请求 `current_time`
 - 否则直接给出自然语言回答
+
+### Real Model
+
+`realModelDecision` 使用 OpenAI Chat Completions Tool Calling API，让真实 LLM 基于 `tools`、`tool_choice=auto`、`system prompt` 和用户问题决定是否返回 tool call。
+
+它用于观察真实模型行为：
+
+- 是否调用工具
+- 选择哪个工具
+- 生成的 JSON arguments 是否符合 schema
+- 不需要工具时是否能直接回答
+- 工具执行失败时 Go 侧如何拦截错误
 
 ### Calculator Tool
 
@@ -53,12 +89,17 @@
 
 它会显式处理除零和未知操作。
 
+### Current Time Tool
+
+`CurrentTimeTool` 用于演示第二个工具，支持回答当前本地时间。它不需要参数，如果模型传入多余参数，会显式返回错误。
+
 ## 设计取舍
 
 | 取舍 | 当前选择 | 原因 |
 |---|---|---|
-| 模型调用 | mock model | 用户当前阶段重点是理解工具调用链路，不依赖 API 额度 |
-| 工具数量 | 1 个 calculator | 先把工具 schema、参数解析、执行、错误处理讲清楚 |
+| 模型调用 | mock + real 两种模式 | mock 保证离线可跑；real 用来观察真实 LLM tool choice |
+| 工具抽象 | `Tool` 接口 + `ToolRegistry` | 作为实验支架，统一收集 schema 并分发 LLM 返回的 tool call |
+| 工具数量 | 2 个演示工具 | 用 `calculator` 展示带参数工具，用 `current_time` 展示无参数工具 |
 | Agent Loop | 暂不实现循环 | 避免第一课知识点过多，后续单独学习最大轮数和错误恢复 |
 | 参数格式 | JSON 字符串 | 贴近真实 Function Calling 返回结构 |
 
@@ -69,20 +110,23 @@
 - 不信任模型返回参数
 - 对 JSON 参数做解析和字段校验
 - 对除零、未知操作返回显式错误
+- 对未知工具名直接拒绝执行
+- 对重复工具名在注册阶段报错
 - 后续涉及文件工具时必须增加目录白名单和路径限制
 
 ## 后续演进
 
-1. 抽象 Go `Tool` 接口
-2. 支持多个工具注册
-3. 实现 Agent Loop：模型请求工具 -> 执行工具 -> 结果回传 -> 模型继续生成
-4. 增加最大循环次数，避免无限调用
-5. 增加日志，记录 tool call 和 observation
-6. 增加安全边界，例如文件读取目录限制
+1. 实现 Agent Loop：模型请求工具 -> 执行工具 -> 结果回传 -> 模型继续生成
+2. 增加最大循环次数，避免无限调用
+3. 增加日志，记录 tool call 和 observation
+4. 增加安全边界，例如文件读取目录限制
+5. 增加更多工具，例如受限文件读取、RAG 检索
 
 ## 变更历史
 
 | 日期 | 变更 | 说明 |
 |---|---|---|
 | 2026-08-10 | 初始化阶段 3 Agent 模块 | 新增 mock Function Calling demo、calculator 工具、测试、README 和设计说明 |
+| 2026-08-11 | 增加 Tool 抽象与多工具注册 | 新增 `Tool` 接口、`ToolRegistry`、`CurrentTimeTool` 和注册表测试 |
+| 2026-08-11 | 调整为 LLM Tool Choice 实验课 | 新增 `-mode real`、`-show-schema`，让真实 LLM 根据 tool schema 决定工具调用 |
 

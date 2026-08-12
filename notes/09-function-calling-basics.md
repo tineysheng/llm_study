@@ -53,11 +53,11 @@ Tool Schema 是工具说明书，用来告诉模型：
   "parameters": {
     "type": "object",
     "properties": {
-      "a": {"type": "number"},
-      "b": {"type": "number"},
-      "op": {"type": "string", "enum": ["add", "subtract", "multiply", "divide"]}
+      "left_operand": {"type": "number"},
+      "right_operand": {"type": "number"},
+      "operation": {"type": "string", "enum": ["add", "subtract", "multiply", "divide"]}
     },
-    "required": ["a", "b", "op"]
+    "required": ["left_operand", "right_operand", "operation"]
   }
 }
 ```
@@ -73,7 +73,7 @@ Tool Call 是模型返回的“我要调用哪个工具、参数是什么”。
 ```json
 {
   "name": "calculator",
-  "arguments": {"a": 12, "b": 30, "op": "add"}
+  "arguments": {"left_operand": 12, "right_operand": 30, "operation": "add"}
 }
 ```
 
@@ -170,7 +170,7 @@ calculator
 
 ```text
 模型决定调用工具: calculator
-arguments: {"a":12,"b":30,"op":"add"}
+arguments: {"left_operand":12,"right_operand":30,"operation":"add"}
 ```
 
 如果问题不需要工具，会直接回答。

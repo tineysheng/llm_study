@@ -97,12 +97,15 @@
 - [x] 让模型根据用户问题决定是否调用工具（mock model 已实现）
 - [x] 解析模型返回的工具名和参数（已解析 tool call JSON arguments）
 
-### 3.2 Tool 抽象
+### 3.2 LLM Tool Choice 与工具抽象
 
-- [ ] 设计 Go `Tool` 接口
-- [ ] 为每个工具定义 name、description、parameters、execute
-- [ ] 实现参数校验
-- [ ] 实现工具执行错误的显式返回
+- 本课材料已调整：`notes/10-tool-abstraction.md` 从“接口设计问答”改为“LLM Tool Choice 实验”。`03-agent/main.go` 已新增 `Tool` 接口、`ToolRegistry`、`CalculatorTool`、`CurrentTimeTool`，并支持 `-mode mock` / `-mode real` 对比离线规则和真实 LLM tool calling 行为。
+- [x] 设计 Go `Tool` 接口
+- [x] 为每个工具定义 name、description、parameters、execute
+- [x] 实现参数校验
+- [x] 实现工具执行错误的显式返回
+- [x] 增加真实 LLM Tool Calling 模式，观察模型如何根据 schema 选择工具
+- [x] 增加 `-show-schema`，打印发给模型的工具说明
 
 ### 3.3 Agent Loop
 
