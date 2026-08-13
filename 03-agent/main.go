@@ -1,7 +1,7 @@
-// Function Calling 基础演示
+// Agent Loop 基础演示
 //
-// 本程序使用 mock model 演示最小工具调用闭环：
-// 用户问题 -> 模型决定是否调用工具 -> Go 解析参数 -> 执行工具 -> 基于工具结果回答。
+// 本程序演示最小 Agent Loop：
+// 用户问题 -> 模型决定是否调用工具 -> Go 执行工具 -> observation 回传给模型 -> 模型继续生成最终回答。
 package main
 
 import (
@@ -28,6 +28,7 @@ type ToolSchema struct {
 }
 
 type ToolCall struct {
+	ID        string `json:"id,omitempty"`
 	Name      string `json:"name"`
 	Arguments string `json:"arguments"`
 }
@@ -48,6 +49,17 @@ type ToolResult struct {
 	Output string
 }
 
+type AgentRun struct {
+	FinalAnswer string
+	Steps       []AgentStep
+}
+
+type AgentStep struct {
+	Number     int
+	ToolCall   ToolCall
+	ToolResult ToolResult
+}
+
 type Tool interface {
 	Schema() ToolSchema
 	Execute(rawArguments string) (ToolResult, error)
@@ -63,6 +75,7 @@ func main() {
 	model := flag.String("model", getEnvString("OPENAI_MODEL", openai.GPT4oMini), "model name used when -mode real")
 	timeoutSeconds := flag.Int("timeout-seconds", getEnvInt("OPENAI_TIMEOUT_SECONDS", 60), "request timeout in seconds when -mode real")
 	showSchema := flag.Bool("show-schema", false, "print full tool schemas sent to the model")
+	maxSteps := flag.Int("max-steps", 3, "maximum number of tool calls allowed in one agent loop")
 	flag.Parse()
 
 	if strings.TrimSpace(*question) == "" {
@@ -77,26 +90,16 @@ func main() {
 	}
 
 	tools := registry.Schemas()
-	decision, err := decideWithMode(*mode, *question, tools, *model, time.Duration(*timeoutSeconds)*time.Second)
+	run, err := runAgentLoop(*mode, *question, registry, *model, time.Duration(*timeoutSeconds)*time.Second, *maxSteps)
 	if err != nil {
-		fmt.Println("模型决策失败:", err)
+		fmt.Println("Agent Loop 执行失败:", err)
 		os.Exit(1)
-	}
-	decision, err = validateModelDecision(decision)
-	if err != nil {
-		fmt.Println("模型输出校验失败:", err)
-		os.Exit(1)
-	}
-	if decision.ToolCall != nil {
-		if err := registry.ValidateToolCall(*decision.ToolCall); err != nil {
-			fmt.Println("工具选择校验失败:", err)
-			os.Exit(1)
-		}
 	}
 
-	fmt.Println("Function Calling 基础演示")
+	fmt.Println("Agent Loop 基础演示")
 	fmt.Println("用户问题:", *question)
 	fmt.Println("模型模式:", *mode)
+	fmt.Println("最大工具调用次数:", *maxSteps)
 	fmt.Println()
 
 	fmt.Println("=== Registered Tools ===")
@@ -110,36 +113,146 @@ func main() {
 	}
 	fmt.Println()
 
-	fmt.Println("=== Model Decision ===")
-	if decision.ToolCall == nil {
+	fmt.Println("=== Agent Loop Trace ===")
+	printAgentTrace(run)
+
+	fmt.Println("=== Final Answer ===")
+	fmt.Println(run.FinalAnswer)
+}
+
+func runAgentLoop(mode, question string, registry *ToolRegistry, model string, timeout time.Duration, maxSteps int) (AgentRun, error) {
+	if maxSteps <= 0 {
+		return AgentRun{}, errors.New("max-steps 必须大于 0")
+	}
+
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case "", "mock":
+		return runMockAgentLoop(question, registry, maxSteps)
+	case "real":
+		apiKey := strings.TrimSpace(os.Getenv("OPENAI_API_KEY"))
+		if apiKey == "" {
+			return AgentRun{}, errors.New("-mode real 需要先设置 OPENAI_API_KEY")
+		}
+		if strings.TrimSpace(model) == "" {
+			return AgentRun{}, errors.New("model 不能为空")
+		}
+		if timeout <= 0 {
+			return AgentRun{}, errors.New("timeout 必须大于 0")
+		}
+		client := openai.NewClient(apiKey)
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		return runRealAgentLoop(ctx, client, model, question, registry, maxSteps)
+	default:
+		return AgentRun{}, fmt.Errorf("未知 mode: %s，可选 mock 或 real", mode)
+	}
+}
+
+func runMockAgentLoop(question string, registry *ToolRegistry, maxSteps int) (AgentRun, error) {
+	run := AgentRun{}
+	decision := mockModelDecision(question)
+	toolCalls := 0
+
+	for {
+		var err error
+		decision, err = validateModelDecision(decision)
+		if err != nil {
+			return AgentRun{}, fmt.Errorf("模型输出校验失败: %w", err)
+		}
+		if decision.ToolCall == nil {
+			run.FinalAnswer = decision.Content
+			return run, nil
+		}
+		if toolCalls >= maxSteps {
+			return AgentRun{}, fmt.Errorf("超过最大工具调用次数 max-steps=%d，已停止以避免无限循环", maxSteps)
+		}
+
+		result, err := executeAndValidateTool(registry, *decision.ToolCall)
+		if err != nil {
+			return AgentRun{}, err
+		}
+		toolCalls++
+		run.Steps = append(run.Steps, AgentStep{Number: toolCalls, ToolCall: *decision.ToolCall, ToolResult: result})
+
+		decision = mockFollowUpDecision(question, *decision.ToolCall, result)
+	}
+}
+
+func runRealAgentLoop(ctx context.Context, client *openai.Client, model, question string, registry *ToolRegistry, maxSteps int) (AgentRun, error) {
+	run := AgentRun{}
+	tools := registry.Schemas()
+	messages := []openai.ChatCompletionMessage{
+		{Role: openai.ChatMessageRoleSystem, Content: toolChoiceSystemPrompt()},
+		{Role: openai.ChatMessageRoleUser, Content: question},
+	}
+	toolCalls := 0
+
+	for {
+		decision, assistantMessage, err := nextRealModelDecision(ctx, client, model, messages, tools)
+		if err != nil {
+			return AgentRun{}, err
+		}
+		decision, err = validateModelDecision(decision)
+		if err != nil {
+			return AgentRun{}, fmt.Errorf("模型输出校验失败: %w", err)
+		}
+		if decision.ToolCall == nil {
+			run.FinalAnswer = decision.Content
+			return run, nil
+		}
+		if decision.ToolCall.ID == "" {
+			return AgentRun{}, errors.New("真实 LLM 返回的 tool call id 为空，无法回传 observation")
+		}
+		if toolCalls >= maxSteps {
+			return AgentRun{}, fmt.Errorf("超过最大工具调用次数 max-steps=%d，已停止以避免无限循环", maxSteps)
+		}
+
+		result, err := executeAndValidateTool(registry, *decision.ToolCall)
+		if err != nil {
+			return AgentRun{}, err
+		}
+		toolCalls++
+		run.Steps = append(run.Steps, AgentStep{Number: toolCalls, ToolCall: *decision.ToolCall, ToolResult: result})
+
+		messages = append(messages, assistantMessage)
+		messages = append(messages, openai.ChatCompletionMessage{
+			Role:       openai.ChatMessageRoleTool,
+			ToolCallID: decision.ToolCall.ID,
+			Name:       result.Name,
+			Content:    result.Output,
+		})
+	}
+}
+
+func executeAndValidateTool(registry *ToolRegistry, call ToolCall) (ToolResult, error) {
+	if err := registry.ValidateToolCall(call); err != nil {
+		return ToolResult{}, fmt.Errorf("工具选择校验失败: %w", err)
+	}
+	result, err := registry.Dispatch(call)
+	if err != nil {
+		return ToolResult{}, fmt.Errorf("工具调用失败: %w", err)
+	}
+	result, err = validateToolResult(call, result)
+	if err != nil {
+		return ToolResult{}, fmt.Errorf("工具结果校验失败: %w", err)
+	}
+	return result, nil
+}
+
+func printAgentTrace(run AgentRun) {
+	if len(run.Steps) == 0 {
 		fmt.Println("模型决定：不需要工具，直接回答。")
 		fmt.Println()
-		fmt.Println("=== Final Answer ===")
-		fmt.Println(decision.Content)
 		return
 	}
 
-	fmt.Println("模型决定调用工具:", decision.ToolCall.Name)
-	fmt.Println("arguments:", decision.ToolCall.Arguments)
-	fmt.Println()
-
-	result, err := registry.Dispatch(*decision.ToolCall)
-	if err != nil {
-		fmt.Println("工具调用失败:", err)
-		os.Exit(1)
+	for _, step := range run.Steps {
+		fmt.Printf("Step %d - Model Tool Call\n", step.Number)
+		fmt.Println("tool:", step.ToolCall.Name)
+		fmt.Println("arguments:", step.ToolCall.Arguments)
+		fmt.Println("Observation:", step.ToolResult.Output)
+		fmt.Println()
 	}
-	result, err = validateToolResult(*decision.ToolCall, result)
-	if err != nil {
-		fmt.Println("工具结果校验失败:", err)
-		os.Exit(1)
-	}
-
-	fmt.Println("=== Tool Result / Observation ===")
-	fmt.Printf("%s result: %s\n", result.Name, result.Output)
-	fmt.Println()
-
-	fmt.Println("=== Final Answer ===")
-	fmt.Println(mockFinalAnswer(*question, result))
 }
 
 func decideWithMode(mode, question string, tools []ToolSchema, model string, timeout time.Duration) (ModelDecision, error) {
@@ -175,6 +288,7 @@ func validateModelDecision(decision ModelDecision) (ModelDecision, error) {
 		return decision, nil
 	}
 
+	decision.ToolCall.ID = strings.TrimSpace(decision.ToolCall.ID)
 	decision.ToolCall.Name = strings.TrimSpace(decision.ToolCall.Name)
 	if decision.ToolCall.Name == "" {
 		return ModelDecision{}, errors.New("模型返回的工具名为空")
@@ -213,24 +327,19 @@ func validateToolResult(call ToolCall, result ToolResult) (ToolResult, error) {
 }
 
 func realModelDecision(ctx context.Context, client *openai.Client, model, question string, tools []ToolSchema) (ModelDecision, error) {
+	messages := []openai.ChatCompletionMessage{
+		{Role: openai.ChatMessageRoleSystem, Content: toolChoiceSystemPrompt()},
+		{Role: openai.ChatMessageRoleUser, Content: question},
+	}
+	decision, _, err := nextRealModelDecision(ctx, client, model, messages, tools)
+	return decision, err
+}
+
+func nextRealModelDecision(ctx context.Context, client *openai.Client, model string, messages []openai.ChatCompletionMessage, tools []ToolSchema) (ModelDecision, openai.ChatCompletionMessage, error) {
 	req := openai.ChatCompletionRequest{
-		Model:       model,
-		Temperature: 0,
-		Messages: []openai.ChatCompletionMessage{
-			{
-				Role: openai.ChatMessageRoleSystem,
-				Content: `你是一个严格的工具调用路由器。请先判断用户问题是否真的需要外部工具：
-- 只有用户给出明确数字并要求加减乘除精确计算时，才调用 calculator。
-- 只有用户询问当前日期、当前时间、现在几点、今天几号时，才调用 current_time。
-- 解释概念、比较方案、总结内容、闲聊、代码设计建议、RAG/Agent/Function Calling 概念问题，都不需要工具。
-- 不需要工具时，必须直接用中文简短回答，不要返回 tool call。
-- 只允许在确实命中工具能力边界时调用工具。`,
-			},
-			{
-				Role:    openai.ChatMessageRoleUser,
-				Content: question,
-			},
-		},
+		Model:               model,
+		Temperature:         0,
+		Messages:            messages,
 		Tools:               toOpenAITools(tools),
 		ToolChoice:          "auto",
 		MaxCompletionTokens: 300,
@@ -239,31 +348,42 @@ func realModelDecision(ctx context.Context, client *openai.Client, model, questi
 
 	resp, err := client.CreateChatCompletion(ctx, req)
 	if err != nil {
-		return ModelDecision{}, err
+		return ModelDecision{}, openai.ChatCompletionMessage{}, err
 	}
 	if len(resp.Choices) == 0 {
-		return ModelDecision{}, errors.New("模型没有返回 choices")
+		return ModelDecision{}, openai.ChatCompletionMessage{}, errors.New("模型没有返回 choices")
 	}
 
 	message := resp.Choices[0].Message
 	if len(message.ToolCalls) == 0 {
-		return ModelDecision{Content: strings.TrimSpace(message.Content)}, nil
+		return ModelDecision{Content: strings.TrimSpace(message.Content)}, message, nil
 	}
 	if len(message.ToolCalls) > 1 {
-		return ModelDecision{}, fmt.Errorf("当前 demo 只支持单次工具调用，但模型返回了 %d 次 tool calls", len(message.ToolCalls))
+		return ModelDecision{}, openai.ChatCompletionMessage{}, fmt.Errorf("当前 demo 只支持单次工具调用，但模型返回了 %d 次 tool calls", len(message.ToolCalls))
 	}
 
 	call := message.ToolCalls[0]
 	if call.Type != openai.ToolTypeFunction {
-		return ModelDecision{}, fmt.Errorf("不支持的 tool call 类型: %s", call.Type)
+		return ModelDecision{}, openai.ChatCompletionMessage{}, fmt.Errorf("不支持的 tool call 类型: %s", call.Type)
 	}
 
 	return ModelDecision{
 		ToolCall: &ToolCall{
+			ID:        call.ID,
 			Name:      call.Function.Name,
 			Arguments: call.Function.Arguments,
 		},
-	}, nil
+	}, message, nil
+}
+
+func toolChoiceSystemPrompt() string {
+	return `你是一个严格的工具调用路由器和 Agent Loop 控制器。请先判断用户问题是否真的需要外部工具：
+- 只有用户给出明确数字并要求加减乘除精确计算时，才调用 calculator。
+- 只有用户询问当前日期、当前时间、现在几点、今天几号时，才调用 current_time。
+- 解释概念、比较方案、总结内容、闲聊、代码设计建议、RAG/Agent/Function Calling 概念问题，都不需要工具。
+- 不需要工具时，必须直接用中文简短回答，不要返回 tool call。
+- 收到工具 observation 后，优先基于 observation 给出最终回答；只有确实还缺新的外部信息时才再次调用工具。
+- 只允许在确实命中工具能力边界时调用工具。`
 }
 
 func toOpenAITools(schemas []ToolSchema) []openai.Tool {
@@ -452,6 +572,12 @@ func mockModelDecision(question string) ModelDecision {
 
 	return ModelDecision{
 		Content: "这个问题不需要调用工具。Function Calling 的核心是：模型先判断是否需要外部工具，如果需要，就返回结构化 tool call，由应用程序执行工具。",
+	}
+}
+
+func mockFollowUpDecision(question string, call ToolCall, result ToolResult) ModelDecision {
+	return ModelDecision{
+		Content: fmt.Sprintf("我已经收到 `%s` 工具的 observation：%s。基于这个结果，原问题 `%s` 的答案是：%s。", call.Name, result.Output, question, result.Output),
 	}
 }
 

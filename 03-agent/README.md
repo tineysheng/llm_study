@@ -2,9 +2,9 @@
 
 本目录用于阶段 3：学习 Function Calling、Tool Calling、Agent Loop 和工具安全边界。
 
-当前版本推进到第二课：**LLM Tool Choice 实验**。
+当前版本推进到第三课：**Agent Loop 基础**。
 
-本课不再把重点放在“为什么要接口”这类泛工程问题上，而是观察：LLM 如何根据 `tool schema`、`system prompt` 和用户问题决定是否调用工具、调用哪个工具、生成什么 JSON 参数。
+本课重点是把单次工具调用升级为循环：模型请求工具，Go 执行工具，把 observation 回传给模型，模型继续生成最终回答。
 
 ## 当前功能
 
@@ -17,7 +17,10 @@
 - 生成 tool call：工具名 + JSON 参数
 - 用 Go 解析和校验工具参数
 - 执行工具并返回结果
-- 基于工具结果生成最终回答
+- 把工具结果作为 observation 回传给模型或 mock follow-up
+- 支持 `-max-steps` 限制最大工具调用次数
+- 输出 `Agent Loop Trace`，记录每次 tool call、arguments 和 observation
+- 基于工具 observation 生成最终回答
 
 ## 运行方式
 
@@ -27,6 +30,7 @@
 go run .\03-agent -mode mock -question "请计算 12 + 30" -show-schema
 go run .\03-agent -mode mock -question "现在几点了？" -show-schema
 go run .\03-agent -mode mock -question "你好，介绍一下 Function Calling" -show-schema
+go run .\03-agent -mode mock -question "请计算 7 * 6" -max-steps 3
 ```
 
 真实 LLM Tool Calling 模式：
@@ -59,12 +63,14 @@ go test .\03-agent
 - 模型不会直接执行工具，只会请求工具调用
 - `tool call` 是模型返回的结构化调用请求
 - Go 程序必须做参数解析、参数校验和错误处理
-- Function Calling 是后续 Agent Loop 的基础
+- Agent Loop 要把工具结果作为 observation 回传给模型继续推理
+- `max-steps` 是防止无限工具调用的硬边界
+- `Agent Loop Trace` 是排查工具误选、参数错误和上下文污染的最小可观测性
 
 ## 当前限制
 
 - 默认使用 mock model，真实 LLM 模式需要 `OPENAI_API_KEY`
 - 当前只有两个演示工具：`calculator`、`current_time`
-- 当前只演示单次工具调用，还不是完整 Agent Loop
-- 后续会继续加入 Agent Loop、最大循环次数、日志和安全边界
+- 当前 Agent Loop 仍是最小版本，暂不包含复杂规划、长期记忆和错误自动恢复
+- 后续会继续加入 ReAct、安全边界、受限文件读取和更多工具
 

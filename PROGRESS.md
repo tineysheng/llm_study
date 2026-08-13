@@ -109,10 +109,11 @@
 
 ### 3.3 Agent Loop
 
-- [ ] 实现“模型请求工具 → 执行工具 → 结果回传 → 模型继续生成”的循环
-- [ ] 支持多个工具注册
-- [ ] 增加最大循环次数，避免无限调用
-- [ ] 增加日志，记录每次 tool call 和 observation
+- 本课材料已新增：`notes/11-agent-loop.md`。`03-agent/main.go` 已新增 `runAgentLoop`、`runMockAgentLoop`、`runRealAgentLoop`、`-max-steps` 和 `Agent Loop Trace`，支持 observation 回传和最终回答生成。
+- [x] 实现“模型请求工具 → 执行工具 → 结果回传 → 模型继续生成”的循环
+- [x] 支持多个工具注册（沿用 `ToolRegistry` 注册 `calculator` 和 `current_time`）
+- [x] 增加最大循环次数，避免无限调用
+- [x] 增加日志，记录每次 tool call 和 observation
 
 ### 3.4 ReAct 与安全边界
 

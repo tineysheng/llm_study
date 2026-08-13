@@ -314,3 +314,54 @@ func TestValidateToolResultRejectsEmptyOutput(t *testing.T) {
 		t.Fatal("expected error for empty tool result output")
 	}
 }
+
+func TestRunAgentLoopMockUsesToolThenFinalAnswer(t *testing.T) {
+	registry, err := NewToolRegistry(CalculatorTool{}, CurrentTimeTool{})
+	if err != nil {
+		t.Fatalf("NewToolRegistry returned error: %v", err)
+	}
+
+	run, err := runAgentLoop("mock", "请计算 7 * 6", registry, "", time.Second, 3)
+	if err != nil {
+		t.Fatalf("runAgentLoop returned error: %v", err)
+	}
+	if len(run.Steps) != 1 {
+		t.Fatalf("len(steps) = %d, want 1", len(run.Steps))
+	}
+	if run.Steps[0].ToolCall.Name != "calculator" || run.Steps[0].ToolResult.Output != "42" {
+		t.Fatalf("step = %+v, want calculator observation 42", run.Steps[0])
+	}
+	if !strings.Contains(run.FinalAnswer, "42") {
+		t.Fatalf("final answer = %q, want it to include tool result", run.FinalAnswer)
+	}
+}
+
+func TestRunAgentLoopMockDirectAnswerWithoutTool(t *testing.T) {
+	registry, err := NewToolRegistry(CalculatorTool{}, CurrentTimeTool{})
+	if err != nil {
+		t.Fatalf("NewToolRegistry returned error: %v", err)
+	}
+
+	run, err := runAgentLoop("mock", "介绍一下 Function Calling", registry, "", time.Second, 3)
+	if err != nil {
+		t.Fatalf("runAgentLoop returned error: %v", err)
+	}
+	if len(run.Steps) != 0 {
+		t.Fatalf("len(steps) = %d, want 0", len(run.Steps))
+	}
+	if run.FinalAnswer == "" {
+		t.Fatal("expected final answer")
+	}
+}
+
+func TestRunAgentLoopRejectsInvalidMaxSteps(t *testing.T) {
+	registry, err := NewToolRegistry(CalculatorTool{})
+	if err != nil {
+		t.Fatalf("NewToolRegistry returned error: %v", err)
+	}
+
+	_, err = runAgentLoop("mock", "请计算 1 + 2", registry, "", time.Second, 0)
+	if err == nil {
+		t.Fatal("expected error for max-steps <= 0")
+	}
+}

@@ -63,9 +63,9 @@ AI 应逐题提问，用户回答后先反馈正确点和不足，再继续下�
 | 阶段 3 | `tutoring/stage-3-agent.md` | Function Calling、LLM Tool Choice、工具调用、后续 Agent Loop |
 ## 当前接续点
 当前位于阶段 3：`Function Calling 与 AI Agent`。
-最新课程：`LLM Tool Choice 与工具抽象课程记录：进行中`，详见：
+最新课程：`Agent Loop 基础课程记录：已完成`，详见：
 - `tutoring/stage-3-agent.md`
-- `notes/10-tool-abstraction.md`
+- `notes/11-agent-loop.md`
 - `03-agent/main.go`
 - `03-agent/main_test.go`
-下一步应围绕 LLM 如何根据 `tool schema`、`system prompt` 和用户问题做 tool choice 进行讲解、运行观察和问答。`Tool` 接口、`ToolRegistry` 只作为实验支架，不要把本课考核变成泛 Go 接口设计八股。不要退回到纯文本讲解，也不要重复已经掌握的 RAG 基础问题。
+下一步进入阶段 3.4：`ReAct 与安全边界`。应围绕 Thought / Action / Observation 思想、危险工具白名单、文件读取目录限制、工具参数严格校验和 Agent 安全边界进行讲解、项目实现、运行观察和问答。不要重复考核已掌握的 Tool Choice 和 Agent Loop 基础问题。
