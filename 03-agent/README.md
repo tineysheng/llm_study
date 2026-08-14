@@ -2,9 +2,9 @@
 
 本目录用于阶段 3：学习 Function Calling、Tool Calling、Agent Loop 和工具安全边界。
 
-当前版本推进到第四课：**ReAct 与安全边界**。
+当前版本推进到第五课：**个人助理 Agent 最小项目**。
 
-本课重点是在 Agent Loop 基础上观察 `Action -> Observation`，并通过受限文件读取工具学习危险工具的白名单、路径限制和参数校验。
+本课重点是把 `calculator`、`current_time`、`file_reader` 三个工具组合成一个可演示、可讲述的最小个人助理 Agent。
 
 ## 当前功能
 
@@ -24,8 +24,15 @@
 - `file_reader` 只能读取 `03-agent/safe-files` 中的 `.md` / `.txt` 文件
 - `file_reader` 拒绝 `../`、绝对路径、Windows 盘符路径、通配符、非文本扩展名和 symlink 逃逸
 - 基于工具 observation 生成最终回答
+- 支持 `-demo` 一次演示计算、时间、文件读取 3 个场景
 
 ## 运行方式
+
+个人助理 Agent 一键演示：
+
+```powershell
+go run .\03-agent -demo
+```
 
 离线 mock 模式：
 
@@ -60,6 +67,26 @@ go run .\03-agent -mode real -question "请计算 8 / 0"
 go test .\03-agent
 ```
 
+## 代码阅读顺序
+
+为了避免所有逻辑堆在 `main.go`，当前代码已按职责拆分：
+
+| 文件 | 先看程度 | 作用 |
+|---|---|---|
+| `main.go` | 必看 | CLI 入口，解析参数，启动单次问题或 `-demo` |
+| `demo.go` | 必看 | 个人助理 Agent 的 3 个内置演示场景 |
+| `agent_loop.go` | 必看 | Agent Loop：模型决策、工具执行、trace 输出 |
+| `registry.go` | 建议看 | 默认工具注册、schema 收集、工具分发 |
+| `model.go` | 建议看 | mock / real 模型决策和 tool choice prompt |
+| `calculator_tool.go` | 按需看 | 计算器工具 |
+| `time_tool.go` | 按需看 | 当前时间工具 |
+| `file_reader_tool.go` | 按需看 | 受限文件读取工具和安全校验 |
+| `types.go` | 查类型时看 | 核心结构体和接口 |
+| `validation.go` | 查校验时看 | 模型输出和工具结果校验 |
+| `config.go` | 查配置时看 | 环境变量读取 |
+
+初学时建议只按这个顺序读：`main.go` -> `demo.go` -> `agent_loop.go` -> `registry.go`。
+
 ## 学习重点
 
 - `tool schema` 本质上是写给模型看的上下文，会影响模型的工具选择和参数生成
@@ -74,6 +101,7 @@ go test .\03-agent
 - ReAct 的工程可观测性重点是 `Action`、`Action Input`、`Observation`，不是暴露完整隐藏思维链
 - 文件读取工具属于危险工具，必须由 Go 侧实现目录白名单和路径限制
 - Tool schema 是软约束，安全边界必须由应用层强制执行
+- 最小个人助理 Agent 的作品集价值在于：能展示工具选择、工具执行、Agent Loop、trace 和安全边界
 
 ## 当前限制
 
@@ -81,5 +109,6 @@ go test .\03-agent
 - 当前有三个演示工具：`calculator`、`current_time`、`file_reader`
 - 当前 Agent Loop 仍是最小版本，暂不包含复杂规划、长期记忆和错误自动恢复
 - 当前 `file_reader` 只用于读取安全示例目录，不支持任意文件读取
-- 后续会继续加入更完整的安全策略、错误恢复和更多工具
+- 当前 `-demo` 使用 mock 模式，保证无需 API Key 也能稳定演示
+- 后续会在作品集阶段补更完整的项目 README、架构图和面试材料
 

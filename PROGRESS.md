@@ -118,6 +118,7 @@
 ### 3.4 ReAct 与安全边界
 
 - 本课材料已新增：`notes/12-react-security.md`。`03-agent/main.go` 已新增 `SafeFileReaderTool`、`file_reader` schema、安全目录 `03-agent/safe-files`、路径校验、扩展名限制、symlink 逃逸检测、读取大小限制和 ReAct 风格 trace。
+- 用户反馈本课安全细节优先级不高，已决定跳过剩余细节考核。后续只保留核心结论：工具参数不可信，危险工具必须由 Go 侧做硬边界。
 - [x] 理解 Thought / Action / Observation 的思想（本课使用可审计的 Action / Action Input / Observation，不暴露完整隐藏思维链）
 - [x] 对危险工具增加白名单或路径限制
 - [x] 对文件读取类工具做目录限制
@@ -125,9 +126,10 @@
 
 ### 3.5 阶段项目
 
-- [ ] 实现一个个人助理 Agent
-- [ ] 至少包含 3 个工具：计算器、本地文件读取、时间或天气查询
-- [ ] 写 README 说明工具列表、执行流程和安全限制
+- 本课材料已新增：`notes/13-personal-assistant-agent.md`。`03-agent/main.go` 已新增 `-demo`、`demoScenarios()`、`runPersonalAssistantDemo()` 和 `newDefaultToolRegistry()`，一键演示计算、时间、文件读取 3 个工具。
+- [x] 实现一个个人助理 Agent
+- [x] 至少包含 3 个工具：计算器、本地文件读取、时间或天气查询
+- [x] 写 README 说明工具列表、执行流程和安全限制
 - [ ] 能解释 Agent 和普通 Chatbot 的本质区别
 
 ## 阶段 4：MCP 协议

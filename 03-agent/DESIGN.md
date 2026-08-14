@@ -4,7 +4,7 @@
 
 阶段 3 的目标是把 LLM 应用从普通聊天扩展为可以调用工具的 Agent。
 
-当前版本在 Tool Choice 实验和最小 Agent Loop 基础上，增加了 ReAct 风格 trace 和受限文件读取安全边界：
+当前版本在 Tool Choice、Agent Loop、ReAct 风格 trace 和受限文件读取基础上，收束成个人助理 Agent 最小项目：
 
 ```text
 工具 schema + system prompt + 用户问题
@@ -16,7 +16,7 @@
 -> 模型继续生成最终回答
 ```
 
-`Tool` 接口和 `ToolRegistry` 仍然是实验支架。课程重点是观察 Agent Loop 如何把模型决策、工具执行、observation 和退出条件串起来，并理解危险工具必须由应用层执行安全边界。
+`Tool` 接口和 `ToolRegistry` 仍然是实验支架。当前重点是让项目具备稳定演示能力：一条 `-demo` 命令展示计算、时间、文件读取三个工具的选择和执行过程。
 
 ## 非目标
 
@@ -26,6 +26,7 @@
 - MCP Server
 - 多轮规划和反思
 - 工具失败后的自动重试策略
+- 长期记忆和复杂任务拆解
 
 这些会在后续课程逐步加入。当前只实现受限 `file_reader`，用于读取 `03-agent/safe-files` 中的学习示例文件。
 
@@ -99,6 +100,16 @@ type Tool interface {
 
 注意：真实产品不应依赖或暴露完整隐藏思维链，trace 记录的是可审计的工具行为。
 
+### Personal Assistant Demo
+
+`-demo` 是当前阶段项目的演示入口。它固定使用 mock 模式运行 3 个场景：
+
+1. 精确计算：`calculator`
+2. 当前时间：`current_time`
+3. 读取安全学习资料：`file_reader`
+
+这样做的目标不是追求复杂能力，而是提供一个稳定、可复现、适合面试展示的最小 Agent 项目。
+
 ### Mock Model
 
 `mockModelDecision` 用确定性规则模拟模型选择工具：
@@ -162,6 +173,7 @@ type Tool interface {
 | 执行日志 | `Agent Loop Trace` | 记录 tool call、arguments 和 observation，支持排查 Agent 行为 |
 | ReAct 输出 | `Action` / `Action Input` / `Observation` | 贴近 ReAct 术语，但不暴露完整隐藏思维链 |
 | 文件读取 | 只读安全示例目录 | 防止路径穿越、敏感文件泄露和上下文污染 |
+| 项目演示 | `-demo` 内置 3 个场景 | 无需 API Key，稳定展示个人助理 Agent 的核心链路 |
 | 参数格式 | JSON 字符串 | 贴近真实 Function Calling 返回结构 |
 
 ## 安全考虑
@@ -214,4 +226,5 @@ type Tool interface {
 | 2026-08-11 | 调整为 LLM Tool Choice 实验课 | 新增 `-mode real`、`-show-schema`，让真实 LLM 根据 tool schema 决定工具调用 |
 | 2026-08-13 | 增加 Agent Loop 基础 | 新增 `runAgentLoop`、`-max-steps`、observation 回传和 `Agent Loop Trace` |
 | 2026-08-13 | 增加 ReAct 与安全边界 | 新增 `file_reader`、安全目录、路径限制、ReAct 风格 trace 和安全测试 |
+| 2026-08-14 | 收束为个人助理 Agent 最小项目 | 新增 `-demo`，一键演示计算、时间和文件读取 3 个工具 |
 

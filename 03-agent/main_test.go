@@ -161,6 +161,44 @@ func TestToolRegistryRejectsDuplicateTool(t *testing.T) {
 	}
 }
 
+func TestDefaultToolRegistryContainsAssistantTools(t *testing.T) {
+	registry, err := newDefaultToolRegistry()
+	if err != nil {
+		t.Fatalf("newDefaultToolRegistry returned error: %v", err)
+	}
+
+	for _, name := range []string{"calculator", "current_time", "file_reader"} {
+		if err := registry.ValidateToolCall(ToolCall{Name: name, Arguments: `{}`}); err != nil {
+			t.Fatalf("default registry missing %s: %v", name, err)
+		}
+	}
+}
+
+func TestDemoScenariosCoverAssistantTools(t *testing.T) {
+	registry, err := newDefaultToolRegistry()
+	if err != nil {
+		t.Fatalf("newDefaultToolRegistry returned error: %v", err)
+	}
+
+	seen := map[string]bool{}
+	for _, scenario := range demoScenarios() {
+		run, err := runAgentLoop("mock", scenario.Question, registry, "", time.Second, 3)
+		if err != nil {
+			t.Fatalf("runAgentLoop(%q) returned error: %v", scenario.Question, err)
+		}
+		if len(run.Steps) != 1 {
+			t.Fatalf("scenario %q steps = %d, want 1", scenario.Question, len(run.Steps))
+		}
+		seen[run.Steps[0].ToolCall.Name] = true
+	}
+
+	for _, name := range []string{"calculator", "current_time", "file_reader"} {
+		if !seen[name] {
+			t.Fatalf("demo scenarios did not cover tool %s", name)
+		}
+	}
+}
+
 func TestMockModelDecisionRequestsCurrentTimeTool(t *testing.T) {
 	decision := mockModelDecision("现在几点了？")
 	if decision.ToolCall == nil {

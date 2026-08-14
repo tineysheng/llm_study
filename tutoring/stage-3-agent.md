@@ -400,3 +400,80 @@ go run .\03-agent -mode mock -question "请读取 ../agent-safety.md"
 
 处理：反馈正确，该追问不计入考核。已补充 `notes/12-react-security.md` 的术语说明，新增 `symlink / 真实路径 / filepath.Rel()` 小节。后续问答必须先确保概念已在文档中解释清楚，不再突然引入未讲过的概念。
 
+用户后续反馈：这课感觉不是很重要，希望跳过。
+
+处理结论：尊重用户判断，阶段 3.4 不再继续做细节考核。当前保留已实现的 `file_reader`、安全目录和 ReAct 风格 trace，作为后续个人助理 Agent 的工具能力之一；但不再继续深挖文件系统安全细节。后续进入阶段 3.5：个人助理 Agent 最小项目，重点转向可演示、可讲述、适合作品集的 Agent 项目闭环。
+
+## 个人助理 Agent 最小项目课程记录：进行中
+
+### 触发原因
+
+用户要求进入下一课。阶段 3.4 已收束并跳过剩余安全细节考核，因此进入阶段 3.5：个人助理 Agent 最小项目。
+
+### 本课风格调整
+
+继续采用用户偏好的第一阶段风格：小目标、少术语、先运行观察、再做 4-6 个贴近项目和面试表达的问题。不再深挖文件系统安全细节。
+
+### 本课知识点
+
+本课只收束前面已有能力：
+
+- `calculator`：精确计算
+- `current_time`：当前时间
+- `file_reader`：读取安全目录里的学习资料
+- `-demo`：一条命令稳定演示 3 个工具
+- `Trace`：展示 Action、Action Input、Observation 和 Final Answer
+
+### 项目落地
+
+已新增：
+
+- `notes/13-personal-assistant-agent.md`：个人助理 Agent 最小项目小课笔记
+
+已修改：
+
+- `03-agent/main.go`：新增 `DemoScenario`、`newDefaultToolRegistry()`、`demoScenarios()`、`runPersonalAssistantDemo()` 和 `-demo` 参数
+- `03-agent/main_test.go`：新增默认工具注册和 demo 场景覆盖测试
+- `03-agent/README.md`：同步 `-demo` 运行方式和当前阶段项目定位
+- `03-agent/DESIGN.md`：同步个人助理 Agent demo 设计
+- `PROGRESS.md`：标记 3.5 阶段项目主要代码任务完成
+
+### 代码可读性调整
+
+用户反馈：阶段 3 的代码全部写在 `main.go`，阅读费劲。
+
+处理：已将 `03-agent/main.go` 从约千行拆分为多个同包文件：
+
+- `main.go`：CLI 入口
+- `demo.go`：个人助理 demo 场景
+- `agent_loop.go`：Agent Loop 主流程
+- `registry.go`：工具注册和分发
+- `model.go`：mock / real 模型决策
+- `calculator_tool.go`：计算器工具
+- `time_tool.go`：时间工具
+- `file_reader_tool.go`：受限文件读取工具
+- `types.go`：核心类型
+- `validation.go`：模型输出和工具结果校验
+- `config.go`：环境变量配置
+
+后续教学应先按 `main.go -> demo.go -> agent_loop.go -> registry.go` 的顺序带用户看主流程，不要要求用户一次读完所有工具实现。
+
+### 当前验证结果
+
+AI 已验证：
+
+```powershell
+go test .\03-agent
+go run .\03-agent -demo
+```
+
+验证现象：
+
+- `-demo` 会依次运行 3 个场景：精确计算、当前时间、读取安全学习资料
+- 每个场景都会打印 `Action`、`Action Input`、`Observation` 和 `Final Answer`
+- `go test .\03-agent` 通过
+
+### 后续问答安排
+
+进入本课问答。只围绕：为什么这是 Agent 而不是普通 Chatbot、三个工具分别解决什么问题、`-demo` 输出怎么看、mock demo 对作品集演示有什么价值、如何用 1 分钟讲清楚这个 Agent 项目。
+

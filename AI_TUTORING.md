@@ -63,9 +63,9 @@ AI 应逐题提问，用户回答后先反馈正确点和不足，再继续下�
 | 阶段 3 | `tutoring/stage-3-agent.md` | Function Calling、LLM Tool Choice、工具调用、后续 Agent Loop |
 ## 当前接续点
 当前位于阶段 3：`Function Calling 与 AI Agent`。
-最新课程：`ReAct 与安全边界课程记录：进行中`，详见：
+最新课程：`个人助理 Agent 最小项目课程记录：进行中`，详见：
 - `tutoring/stage-3-agent.md`
-- `notes/12-react-security.md`
+- `notes/13-personal-assistant-agent.md`
 - `03-agent/main.go`
 - `03-agent/main_test.go`
-下一步继续阶段 3.4 问答，但必须按“第一阶段风格”收束：先围绕 `notes/12-react-security.md` 顶部“本课第一阶段风格版”提问，只考 `Action` / `Action Input` / `Observation`、`file_reader` 为什么危险、tool schema 为什么不是安全边界、危险路径应拒绝、observation 不能泄露敏感信息。不要继续深挖 `symlink`、`filepath.EvalSymlinks()`、`filepath.Rel()` 等文件系统安全细节，除非先重新讲解并明确作为扩展。
+下一步继续阶段 3.5：`个人助理 Agent 最小项目` 的运行观察和问答。重点围绕 `go run .\03-agent -demo` 输出，考核为什么这是 Agent 而不是普通 Chatbot、三个工具分别解决什么问题、Action / Action Input / Observation 怎么看、mock demo 对作品集演示有什么价值、如何用 1 分钟讲清楚项目。继续保持第一阶段风格：小目标、少术语、贴近输出和面试表达。
