@@ -356,6 +356,20 @@ go run .\03-agent -mode mock -question "请读取 ../agent-safety.md"
 
 进入本课问答。考核应重点覆盖：ReAct 的 Thought / Action / Observation 含义、为什么不暴露完整隐藏思维链、为什么文件读取工具危险、为什么 tool schema 不是安全边界、如何防路径穿越、为什么限制 observation 长度，以及真实项目如何解释 Agent 安全边界。
 
+### 课程节奏反馈与调整
+
+用户反馈：最近几课不如第一阶段学习体验好，问题有时引入文档没充分解释的概念，考核偏向细碎安全工程追问，偏离 LLM / Agent 工程主线。
+
+处理结论：反馈正确。阶段 3.4 从现在起改回第一阶段风格：
+
+1. 先讲少量术语，再看代码和输出。
+2. 每课只围绕 3-5 个核心知识点。
+3. 考核只问文档明确解释过的概念。
+4. 文件系统安全细节只作为扩展，不作为当前核心考核。
+5. 面试表达聚焦 Agent 安全边界，而不是泛文件系统安全专项。
+
+已更新 `notes/12-react-security.md`，新增“本课第一阶段风格版”“本课考核边界”，明确 `symlink`、`filepath.EvalSymlinks()`、`filepath.Rel()` 暂不作为核心考核。
+
 ### 问答记录
 
 #### Q1：ReAct 里的 `Thought / Action / Observation` 分别是什么意思？为什么真实项目里不建议暴露完整隐藏 `Thought`？

@@ -68,4 +68,4 @@ AI 应逐题提问，用户回答后先反馈正确点和不足，再继续下�
 - `notes/12-react-security.md`
 - `03-agent/main.go`
 - `03-agent/main_test.go`
-下一步应围绕 ReAct 的 Action / Action Input / Observation、为什么不暴露完整隐藏思维链、危险工具白名单、文件读取目录限制、路径穿越防护、工具参数严格校验和 Agent 安全边界进行问答。不要重复考核已掌握的 Tool Choice 和 Agent Loop 基础问题。
+下一步继续阶段 3.4 问答，但必须按“第一阶段风格”收束：先围绕 `notes/12-react-security.md` 顶部“本课第一阶段风格版”提问，只考 `Action` / `Action Input` / `Observation`、`file_reader` 为什么危险、tool schema 为什么不是安全边界、危险路径应拒绝、observation 不能泄露敏感信息。不要继续深挖 `symlink`、`filepath.EvalSymlinks()`、`filepath.Rel()` 等文件系统安全细节，除非先重新讲解并明确作为扩展。

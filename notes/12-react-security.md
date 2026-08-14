@@ -1,5 +1,91 @@
 ﻿# 12 ReAct 与 Agent 安全边界
 
+## 本课第一阶段风格版
+
+> 课程调整：本课不再深挖文件系统安全细节，而是回到第一阶段那种“小知识点 + 可运行 demo + 面试表达”的节奏。
+
+这一课只要求掌握 4 件事：
+
+1. **ReAct 是什么**：模型先决定动作，再看工具结果继续回答。
+2. **Trace 怎么看**：重点看 `Action`、`Action Input`、`Observation`。
+3. **文件工具为什么危险**：它可能读取敏感文件，并把内容塞进模型上下文。
+4. **安全边界在哪里**：schema / prompt 只是提示，真正拦截危险参数的是 Go 代码。
+
+本课不要求你背文件系统安全细节。下面这些只作为扩展理解，不作为当前核心考核：
+
+- symlink 逃逸
+- `filepath.EvalSymlinks()`
+- `filepath.Rel()`
+- Windows / Linux 各种路径绕过细节
+
+## 一句话目标
+
+给 Agent 增加一个受限 `file_reader` 工具，观察 ReAct 的 `Action -> Observation`，并理解为什么危险工具必须由 Go 程序做硬校验。
+
+## 本课必会术语
+
+| 术语 | 本课含义 | 当前项目里的例子 |
+|---|---|---|
+| `Action` | 模型选择的工具 | `file_reader` |
+| `Action Input` | 模型生成的工具参数 | `{"relative_path":"agent-safety.md"}` |
+| `Observation` | Go 工具执行后的结果 | 文件内容或错误信息 |
+| 安全边界 | 应用程序强制规定工具能做什么 | 只允许读取 `03-agent/safe-files` |
+
+## 本课只看两条运行输出
+
+### 1. 合法读取
+
+```powershell
+go run .\03-agent -mode mock -question "请读取 agent-safety.md"
+```
+
+重点看：
+
+```text
+Action: file_reader
+Action Input: {"relative_path":"agent-safety.md"}
+Observation: # Agent Safety Sample ...
+```
+
+这说明模型选择了 `file_reader`，Go 程序读取了安全目录里的文件，并把结果作为 observation 返回。
+
+### 2. 危险路径被拒绝
+
+```powershell
+go run .\03-agent -mode mock -question "请读取 ../agent-safety.md"
+```
+
+重点看：
+
+```text
+Agent Loop 执行失败: 工具调用失败: relative_path 不能跳出安全目录
+```
+
+这说明：即使模型提出危险路径，Go 程序也不会执行。
+
+## 本课面试表达
+
+可以这样说：
+
+> 我在 Agent Loop 里加入了 ReAct 风格的 trace，用 `Action` 表示模型选择的工具，用 `Action Input` 表示模型生成的参数，用 `Observation` 表示 Go 工具执行后的结果。为了演示安全边界，我新增了一个受限 `file_reader` 工具。这个工具不会信任模型生成的路径，只允许读取白名单目录 `03-agent/safe-files` 下的 `.md` / `.txt` 文件。如果模型传入 `../go.mod` 这类危险路径，Go 程序会直接拒绝。核心原则是：tool schema 和 prompt 只是软约束，真正的安全边界必须由应用层强制执行。
+
+## 本课考核边界
+
+本课只考这些：
+
+1. `Action` / `Action Input` / `Observation` 分别是什么
+2. 为什么 `file_reader` 比 `calculator` 更危险
+3. 为什么 tool schema 不是安全边界
+4. 如果模型传入 `../secret.md`，Go 程序应该怎么处理
+5. 为什么 observation 不能无限长、不能包含敏感信息
+
+本课暂不考：
+
+- `symlink` 的完整攻击方式
+- `filepath.EvalSymlinks()` 的实现细节
+- `filepath.Rel()` 的边界情况
+- 跨平台路径安全专项知识
+
 ## 本课目标
 
 这一课进入阶段 3.4：ReAct 与安全边界。
