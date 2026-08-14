@@ -4,16 +4,19 @@
 2. `README.md`：整体学习路线
 3. `PROGRESS.md`：当前任务进度
 ## 我的学习偏好
-我是 Go 程序员，目标是学习 AI 应用开发和 AI Agent 工程，并最终具备找相关工作的能力。
-我不希望学习方式是“自己从零手写所有代码”。真实开发中大量代码可以由 AI 辅助生成，所以更希望采用下面的方式：
-1. AI 先设计当前阶段需要学习的知识点
-2. AI 说明这个知识点为什么重要，以及工作中怎么用
-3. AI 把这个知识点实现到 Go 项目里
-4. AI 解释关键代码、设计取舍和运行现象
-5. 我运行项目、阅读代码、提出疑问
-6. AI 围绕概念、代码和面试表达向我提问
-7. 如果我回答得好，进入下一个学习步骤
-8. 如果我回答得不好，AI 补充讲解、调整代码或重新提问
+我是拥有 6 年经验的资深 Go 后端工程师，目标是高效转型 AI 应用开发与 AI Agent 架构设计，并最终具备拿下优质 AI 应用/Agent 岗位的面试与实战能力。
+
+我不希望学习方式是“自己从零手写所有代码”。代码由 AI 辅助生成与模块化实现，我的重点是**架构理解、时序链路、调试解释、简历包装与面试表达**。
+
+学习流程全面升级为以下模式：
+1. **架构白板图先行（全局视角）**：每个模块先用清晰的架构时序图 / 数据流图（ASCII / Mermaid）讲透组件交互与数据流向，拒绝直接扎入代码死板细节。
+2. **AI 落地与模块拆分**：AI 将功能拆解为清晰的 Go 代码模块并实现。
+3. **运行观察与链路核对**：我运行程序，观察 Action、Observation、Trace 和行为变化。
+4. **实战模拟面试考核（Storytelling 导向）**：
+   - AI 化身资深 AI 架构面试官，以真实高频面试场景和追问形式考核。
+   - 绝不提问通用 Go 后端八股文（我已有 6 年经验），只聚焦 LLM / RAG / Agent / MCP 本质、上下文管理、Token 控制与架构取舍。
+   - 逐题考核，重点帮我打磨 1~2 分钟的项目讲述说辞（STAR 原则）与简历亮点。
+5. **通过判断与沉淀**：回答合格后进入下一关，并同步沉淀到阶段记录和面试题库。
 补充要求：
 - 每一课必须先在文档里讲清楚新术语，再进入运行和问答。
 - 不要在问答中突然引入文档没解释过的概念。
@@ -62,10 +65,7 @@ AI 应逐题提问，用户回答后先反馈正确点和不足，再继续下�
 | 阶段 2 | `tutoring/stage-2-rag.md` | Prompt 补课、RAG、Embedding、文档切分、向量库、RAG 链路、RAG 调优 |
 | 阶段 3 | `tutoring/stage-3-agent.md` | Function Calling、LLM Tool Choice、工具调用、后续 Agent Loop |
 ## 当前接续点
-当前位于阶段 3：`Function Calling 与 AI Agent`。
-最新课程：`个人助理 Agent 最小项目课程记录：进行中`，详见：
-- `tutoring/stage-3-agent.md`
-- `notes/13-personal-assistant-agent.md`
-- `03-agent/main.go`
-- `03-agent/main_test.go`
-下一步继续阶段 3.5：`个人助理 Agent 最小项目` 的运行观察和问答。重点围绕 `go run .\03-agent -demo` 输出，考核为什么这是 Agent 而不是普通 Chatbot、三个工具分别解决什么问题、Action / Action Input / Observation 怎么看、mock demo 对作品集演示有什么价值、如何用 1 分钟讲清楚项目。继续保持第一阶段风格：小目标、少术语、贴近输出和面试表达。
+当前阶段 3（`Function Calling 与 AI Agent`）已全线通关！
+准备进入阶段 4：`MCP 协议（Model Context Protocol）`。
+- 阶段 3 产出已沉淀在 `03-agent/`、`notes/13-personal-assistant-agent.md` 和 `tutoring/stage-3-agent.md`。
+- 下一步开启阶段 4.1：MCP 核心概念、Host/Client/Server 架构时序图与 Go 最小 MCP Server 设计。

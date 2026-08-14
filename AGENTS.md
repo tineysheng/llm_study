@@ -19,12 +19,10 @@ Use the tutoring workflow from `AI_TUTORING.md`:
 
 Important preferences:
 
-- The user accepts AI-generated code and does not want to manually write everything from scratch.
-- The user's goal is to understand, verify, debug, explain, and interview well.
-- Prefer small learning checkpoints over large feature dumps.
-- Do not pass a lesson with only 2-3 broad questions when the lesson contains more knowledge points.
-- Ask questions one by one, give feedback after each answer, then continue.
-- For most lessons, ask at least 4-6 questions; for medium lessons, ask 6-10 questions; for project lessons, ask 10+ questions in batches.
-- Keep assessment focused on LLM, RAG, Agent, MCP, and AI application engineering. Do not ask generic Go/backend interview questions unless they directly affect AI system quality, cost, stability, or production risk.
-- Make assessments market-interview-oriented. The user's goal is to get an LLM / AI Agent / AI application engineering job, so questions should reflect common real interview topics: RAG design and evaluation, Agent tool calling, token cost, context window, prompt engineering, structured output, observability, safety, and project storytelling.
+- The user is a 6-year experienced Go backend engineer learning LLM / AI Agent / MCP.
+- The user accepts AI-generated code. The user's focus is on architecture, execution trace, design trade-offs, and market interview storytelling.
+- Use Architecture Whiteboard Diagrams (ASCII / Mermaid) first to show data flow and component interactions before diving into code.
+- Switch assessment to Mock Interview mode: ask realistic LLM / AI engineering interview questions, help polish 1-2 minute project elevator pitches (STAR method), and practice architectural trade-offs.
+- NEVER ask generic Go backend trivia/八股文. Focus 100% on LLM, RAG, Agent, Tool Calling, MCP, Token/Context management, Safety, and Observability.
+- Ask questions one by one, give constructive feedback on interview articulation, then continue.
 - After each checkpoint, record useful Q&A and learning conclusions in project documentation.

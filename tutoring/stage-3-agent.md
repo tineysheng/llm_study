@@ -473,7 +473,17 @@ go run .\03-agent -demo
 - 每个场景都会打印 `Action`、`Action Input`、`Observation` 和 `Final Answer`
 - `go test .\03-agent` 通过
 
-### 后续问答安排
+### 阶段 3.5 模拟面试与项目验收完成
 
-进入本课问答。只围绕：为什么这是 Agent 而不是普通 Chatbot、三个工具分别解决什么问题、`-demo` 输出怎么看、mock demo 对作品集演示有什么价值、如何用 1 分钟讲清楚这个 Agent 项目。
+用户与 AI 模拟面试官完成了阶段 3.5 个人助理 Agent 最小项目的综合面试问答：
+
+1. **Q1（状态机与 ReAct 链路）**：清晰阐述了用户请求 -> LLM 判断 -> Action Input -> Go 参数校验与工具分发 -> Observation 回传 -> 循环/最终回答的完整时序。
+2. **Q2（防御性校验与自愈熔断）**：准确指出了大模型参数不可信必须做 Go 侧白名单与路径校验、工具执行报错转为 Observation 供模型自愈、以及通过 `MaxSteps` 避免死循环的熔断机制。
+3. **Q3（技术选型与 AI 工程思考）**：从 Go 语言静态类型安全、低开销与高并发、单二进制轻量部署，以及摆脱庞大重量级框架过度封装、实现高透明度和高可控性的生产级工程角度完成答辩。
+
+### 阶段 3 总结
+
+阶段 3（Function Calling 与 AI Agent）已全线通关！
+- 核心产出：`03-agent` 模块（支持计算器、系统时间、沙箱文件读取 3 大工具，具备 ReAct Trace、ToolRegistry、防御校验与 MaxSteps 熔断兜底）。
+- 下一步：开启阶段 4（MCP 协议）。
 
