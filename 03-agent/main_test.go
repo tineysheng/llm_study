@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -177,15 +178,101 @@ func TestCurrentTimeToolRejectsUnexpectedArguments(t *testing.T) {
 	}
 }
 
+func TestFileReaderToolReadsAllowedFile(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "agent-safety.md"), []byte("safe content"), 0o600); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	result, err := NewSafeFileReaderTool(root, 4096).Execute(`{"relative_path":"agent-safety.md"}`)
+	if err != nil {
+		t.Fatalf("file reader returned error: %v", err)
+	}
+	if result.Name != "file_reader" || result.Output != "safe content" {
+		t.Fatalf("result = %+v, want file_reader safe content", result)
+	}
+}
+
+func TestParseFileReaderArgsRejectsUnsafePaths(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+	}{
+		{name: "missing required", raw: `{}`},
+		{name: "unknown field", raw: `{"path":"agent-safety.md"}`},
+		{name: "parent traversal", raw: `{"relative_path":"../go.mod"}`},
+		{name: "wildcard", raw: `{"relative_path":"*.md"}`},
+		{name: "unsupported extension", raw: `{"relative_path":"secret.json"}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := parseFileReaderArgs(tt.raw)
+			if err == nil {
+				t.Fatal("expected unsafe path error")
+			}
+		})
+	}
+}
+
+func TestCleanSafeRelativePathRejectsAbsolutePath(t *testing.T) {
+	absPath := filepath.Join(t.TempDir(), "secret.md")
+	_, err := cleanSafeRelativePath(absPath)
+	if err == nil {
+		t.Fatal("expected error for absolute path")
+	}
+}
+
+func TestFileReaderToolRejectsSymlinkEscape(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	outsideFile := filepath.Join(outside, "secret.md")
+	if err := os.WriteFile(outsideFile, []byte("secret"), 0o600); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	linkPath := filepath.Join(root, "link.md")
+	if err := os.Symlink(outsideFile, linkPath); err != nil {
+		t.Skipf("symlink not available on this platform: %v", err)
+	}
+
+	_, err := NewSafeFileReaderTool(root, 4096).Execute(`{"relative_path":"link.md"}`)
+	if err == nil {
+		t.Fatal("expected symlink escape error")
+	}
+}
+
+func TestMockModelDecisionRequestsFileReaderTool(t *testing.T) {
+	decision := mockModelDecision("请读取 agent-safety.md")
+	if decision.ToolCall == nil {
+		t.Fatal("expected file_reader tool call")
+	}
+	if decision.ToolCall.Name != "file_reader" {
+		t.Fatalf("tool name = %s, want file_reader", decision.ToolCall.Name)
+	}
+}
+
+func TestRunAgentLoopRejectsUnsafeFileReadRequest(t *testing.T) {
+	registry, err := NewToolRegistry(CalculatorTool{}, CurrentTimeTool{}, NewSafeFileReaderTool(t.TempDir(), 4096))
+	if err != nil {
+		t.Fatalf("NewToolRegistry returned error: %v", err)
+	}
+
+	_, err = runAgentLoop("mock", "请读取 ../agent-safety.md", registry, "", time.Second, 3)
+	if err == nil {
+		t.Fatal("expected unsafe file read error")
+	}
+}
+
 func TestToOpenAIToolsPreservesSchemaForModel(t *testing.T) {
-	registry, err := NewToolRegistry(CalculatorTool{}, CurrentTimeTool{})
+	registry, err := NewToolRegistry(CalculatorTool{}, CurrentTimeTool{}, NewSafeFileReaderTool(t.TempDir(), 4096))
 	if err != nil {
 		t.Fatalf("NewToolRegistry returned error: %v", err)
 	}
 
 	tools := toOpenAITools(registry.Schemas())
-	if len(tools) != 2 {
-		t.Fatalf("len(tools) = %d, want 2", len(tools))
+	if len(tools) != 3 {
+		t.Fatalf("len(tools) = %d, want 3", len(tools))
 	}
 	if tools[0].Type != openai.ToolTypeFunction {
 		t.Fatalf("tool type = %s, want function", tools[0].Type)

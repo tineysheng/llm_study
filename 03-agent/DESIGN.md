@@ -4,7 +4,7 @@
 
 阶段 3 的目标是把 LLM 应用从普通聊天扩展为可以调用工具的 Agent。
 
-当前版本在 Tool Choice 实验基础上，增加了最小 Agent Loop：
+当前版本在 Tool Choice 实验和最小 Agent Loop 基础上，增加了 ReAct 风格 trace 和受限文件读取安全边界：
 
 ```text
 工具 schema + system prompt + 用户问题
@@ -16,18 +16,18 @@
 -> 模型继续生成最终回答
 ```
 
-`Tool` 接口和 `ToolRegistry` 仍然是实验支架。课程重点是观察 Agent Loop 如何把模型决策、工具执行、observation 和退出条件串起来。
+`Tool` 接口和 `ToolRegistry` 仍然是实验支架。课程重点是观察 Agent Loop 如何把模型决策、工具执行、observation 和退出条件串起来，并理解危险工具必须由应用层执行安全边界。
 
 ## 非目标
 
 当前版本暂不实现：
 
-- 文件读取工具
+- 任意文件读取工具
 - MCP Server
 - 多轮规划和反思
 - 工具失败后的自动重试策略
 
-这些会在后续课程逐步加入。
+这些会在后续课程逐步加入。当前只实现受限 `file_reader`，用于读取 `03-agent/safe-files` 中的学习示例文件。
 
 ## 当前组件
 
@@ -91,12 +91,21 @@ type Tool interface {
 
 这个 trace 是当前 demo 的最小可观测性能力，用于排查工具误选、参数错误和 observation 污染。
 
+当前输出采用 ReAct 风格字段：
+
+- `Action`：模型选择的工具
+- `Action Input`：模型生成的 JSON arguments
+- `Observation`：Go 执行工具后的结果
+
+注意：真实产品不应依赖或暴露完整隐藏思维链，trace 记录的是可审计的工具行为。
+
 ### Mock Model
 
 `mockModelDecision` 用确定性规则模拟模型选择工具：
 
 - 如果问题里包含简单数学表达式，就请求 `calculator`
 - 如果问题询问当前时间，就请求 `current_time`
+- 如果问题要求读取 `.md` / `.txt` 文件，就请求 `file_reader`
 - 否则直接给出自然语言回答
 
 ### Real Model
@@ -126,16 +135,33 @@ type Tool interface {
 
 `CurrentTimeTool` 用于演示第二个工具，支持回答当前本地时间。它不需要参数，如果模型传入多余参数，会显式返回错误。
 
+### Safe File Reader Tool
+
+`SafeFileReaderTool` 用于演示危险工具的安全边界。它只允许读取安全示例目录中的 `.md` / `.txt` 文件。
+
+防护策略：
+
+- `relative_path` 必须是相对路径
+- 拒绝 `../` 跳出安全目录
+- 拒绝绝对路径和 Windows 盘符路径
+- 拒绝通配符
+- 拒绝非 `.md` / `.txt` 扩展名
+- 使用 `filepath.EvalSymlinks` 防止 symlink 逃逸
+- 限制最大读取字节数
+- 拒绝非 UTF-8 文本
+
 ## 设计取舍
 
 | 取舍 | 当前选择 | 原因 |
 |---|---|---|
 | 模型调用 | mock + real 两种模式 | mock 保证离线可跑；real 用来观察真实 LLM tool choice |
 | 工具抽象 | `Tool` 接口 + `ToolRegistry` | 作为实验支架，统一收集 schema 并分发 LLM 返回的 tool call |
-| 工具数量 | 2 个演示工具 | 用 `calculator` 展示带参数工具，用 `current_time` 展示无参数工具 |
+| 工具数量 | 3 个演示工具 | 用 `calculator` 展示带参数工具，用 `current_time` 展示无参数工具，用 `file_reader` 展示危险工具安全边界 |
 | Agent Loop | 实现最小循环 | 先掌握 tool call、observation、最终回答和退出条件，不急着做复杂规划 |
 | 最大循环次数 | `-max-steps` 默认 3 | 防止真实模型反复调用工具造成无限循环、成本失控和调试困难 |
 | 执行日志 | `Agent Loop Trace` | 记录 tool call、arguments 和 observation，支持排查 Agent 行为 |
+| ReAct 输出 | `Action` / `Action Input` / `Observation` | 贴近 ReAct 术语，但不暴露完整隐藏思维链 |
+| 文件读取 | 只读安全示例目录 | 防止路径穿越、敏感文件泄露和上下文污染 |
 | 参数格式 | JSON 字符串 | 贴近真实 Function Calling 返回结构 |
 
 ## 安全考虑
@@ -149,15 +175,35 @@ type Tool interface {
 - 对重复工具名在注册阶段报错
 - 对工具结果名称和输出做校验，避免 observation 污染
 - 用 `max-steps` 防止无限工具调用
-- 后续涉及文件工具时必须增加目录白名单和路径限制
+- 文件读取工具使用目录白名单、路径清理、真实路径校验、扩展名限制、大小限制和 UTF-8 校验
+
+### 威胁模型
+
+当前 `file_reader` 主要防御：
+
+- 路径穿越：例如 `../go.mod`
+- 绝对路径读取：例如 `C:\Users\Administrator\.ssh\id_rsa`
+- Windows 盘符路径绕过
+- 通配符读取大量文件
+- symlink 指向安全目录外文件
+- 读取非文本或超大文件导致上下文污染和成本失控
+- 将敏感文件内容作为 observation 泄露给模型
+
+### 安全决策
+
+- 只允许读取 `03-agent/safe-files` 目录下文件
+- 只允许 `.md` / `.txt`，便于学习和展示
+- 文件路径必须由 Go 侧校验，不能信任模型生成的 arguments
+- 即使 tool schema 写了限制，也必须在 `Execute()` 里做硬校验
+- observation 限制最大字节数，避免成本和 context window 失控
 
 ## 后续演进
 
-1. 增加 ReAct 术语和 Thought / Action / Observation 解释
-2. 增加安全边界，例如文件读取目录限制
-3. 增加更多工具，例如受限文件读取、RAG 检索
-4. 增加工具失败后的错误恢复策略
-5. 增加更完整的 Agent 评测用例
+1. 增加工具失败后的错误恢复策略
+2. 增加重复 tool call 检测
+3. 增加 RAG 检索工具
+4. 增加更完整的 Agent 评测用例
+5. 后续阶段对接 MCP 工具协议
 
 ## 变更历史
 
@@ -167,4 +213,5 @@ type Tool interface {
 | 2026-08-11 | 增加 Tool 抽象与多工具注册 | 新增 `Tool` 接口、`ToolRegistry`、`CurrentTimeTool` 和注册表测试 |
 | 2026-08-11 | 调整为 LLM Tool Choice 实验课 | 新增 `-mode real`、`-show-schema`，让真实 LLM 根据 tool schema 决定工具调用 |
 | 2026-08-13 | 增加 Agent Loop 基础 | 新增 `runAgentLoop`、`-max-steps`、observation 回传和 `Agent Loop Trace` |
+| 2026-08-13 | 增加 ReAct 与安全边界 | 新增 `file_reader`、安全目录、路径限制、ReAct 风格 trace 和安全测试 |
 

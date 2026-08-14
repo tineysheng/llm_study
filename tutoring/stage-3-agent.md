@@ -296,3 +296,93 @@ go run .\03-agent -mode mock -question "介绍一下 Function Calling"
 
 Agent Loop 基础课已通过。用户已经能够解释：Agent Loop 与单次 Function Calling 的区别、observation 回传价值、`max-steps` 的作用、trace 的排障价值、`tool_call_id` 的关联作用、反复调用工具的排查方式，以及真实 Agent 需要多种停止策略。后续进入阶段 3.4：ReAct 与安全边界，重点学习 Thought / Action / Observation 思想，以及文件读取类工具的白名单和路径限制。
 
+## ReAct 与安全边界课程记录：进行中
+
+### 触发原因
+
+用户要求进入下一课。阶段 3.3 Agent Loop 已通过，因此进入阶段 3.4：ReAct 与安全边界。
+
+### 本课知识点
+
+本课把 Agent Loop 输出调整为更贴近 ReAct 的观察方式：
+
+```text
+Reasoning summary / Thought -> Action -> Action Input -> Observation -> Final Answer
+```
+
+学习重点：
+
+- `ReAct`：Reasoning + Acting，强调模型决策和工具行动的结合
+- `Action`：模型选择的工具
+- `Action Input`：模型生成的 JSON arguments
+- `Observation`：Go 工具执行后的结果
+- 不暴露完整隐藏思维链，只记录可审计的工具行为
+- 文件读取工具属于危险工具，必须限制目录、路径、扩展名和读取大小
+- tool schema / prompt 是软约束，Go 侧安全校验才是硬边界
+
+### 项目落地
+
+已新增：
+
+- `notes/12-react-security.md`：ReAct 术语、安全边界、运行观察、常见误区和面试表达
+- `03-agent/safe-files/agent-safety.md`：受限文件读取示例文件
+
+已修改：
+
+- `03-agent/main.go`：新增 `SafeFileReaderTool`、`file_reader` schema、路径校验、symlink 逃逸防护、读取大小限制和 ReAct 风格 trace
+- `03-agent/main_test.go`：新增安全文件读取、路径穿越拒绝、绝对路径拒绝、通配符拒绝、扩展名拒绝、symlink 逃逸拒绝和 mock tool choice 测试
+- `03-agent/README.md`：同步 ReAct 与 file_reader 运行方式
+- `03-agent/DESIGN.md`：同步威胁模型、安全决策和设计取舍
+- `PROGRESS.md`：标记阶段 3.4 代码任务完成
+
+### 当前验证结果
+
+AI 已验证：
+
+```powershell
+go test .\03-agent
+go run .\03-agent -mode mock -question "请读取 agent-safety.md"
+go run .\03-agent -mode mock -question "请读取 ../agent-safety.md"
+```
+
+验证现象：
+
+- `go test .\03-agent` 通过
+- 正常读取 `agent-safety.md` 时，trace 输出 `Action: file_reader`、`Action Input` 和 `Observation`
+- 路径穿越请求 `../agent-safety.md` 被 Go 侧拒绝：`relative_path 不能跳出安全目录`
+- 编辑器诊断 `03-agent/main.go` 和 `03-agent/main_test.go` 无错误
+
+### 后续问答安排
+
+进入本课问答。考核应重点覆盖：ReAct 的 Thought / Action / Observation 含义、为什么不暴露完整隐藏思维链、为什么文件读取工具危险、为什么 tool schema 不是安全边界、如何防路径穿越、为什么限制 observation 长度，以及真实项目如何解释 Agent 安全边界。
+
+### 问答记录
+
+#### Q1：ReAct 里的 `Thought / Action / Observation` 分别是什么意思？为什么真实项目里不建议暴露完整隐藏 `Thought`？
+
+用户回答：`Action` 是工具；`Action Input` 是输入给工具的数据；`Observation` 是工具输出；为什么不暴露完整 Thought 还不清楚。
+
+结论：前三点回答正确。当前项目里 `Action` 对应模型选择的工具名，例如 `file_reader`；`Action Input` 对应模型生成的 JSON arguments，例如 `{"relative_path":"agent-safety.md"}`；`Observation` 对应 Go 工具执行后的结果，例如文件内容或错误信息。补充：真实项目不建议暴露完整隐藏 `Thought`，因为完整推理链可能包含不稳定推理、敏感信息、提示词细节、安全策略、误导性中间判断，甚至增加被攻击者利用的风险。工程上更推荐记录可审计的高层决策摘要和工具 trace，即 `Action / Action Input / Observation`，这样既能排查问题，又不会依赖或泄露模型完整隐藏思维链。
+
+#### Q2：为什么 `file_reader` 这种工具比 `calculator` 更危险？
+
+用户回答：`calculator` 最坏是不可用；读文件不限制路径可能会读取电脑重要东西；模型有时候会发疯，不能完全相信模型；否则模型就会随便使用工具。
+
+结论：回答方向正确。`calculator` 的风险通常是算错、参数错误、除零、不可用或成本浪费，影响范围相对小；`file_reader` 一旦没有路径限制，可能读取 `.env`、API Key、SSH 私钥、源码、配置文件、用户隐私数据或系统文件，并把这些内容作为 observation 塞回模型上下文，造成敏感信息泄露。模型生成的路径不能直接相信，因为模型可能误解用户意图、被 prompt injection 诱导、生成路径穿越、绝对路径或通配符。白名单目录的作用是把工具能力收窄到明确允许的范围，让模型即使请求危险路径，Go 侧也会拒绝执行。
+
+#### Q3：为什么说 `tool schema` 不是安全边界？当前代码里哪些函数在做真正的安全边界？
+
+用户回答：因为访问路径还是有可能读取权限外的路径；如果真实 LLM 生成 `{"relative_path":"../go.mod"}`，程序应该报错返回；当前代码中哪些函数做安全边界还不知道。
+
+结论：回答方向正确。`tool schema` 和 description 是写给模型看的软约束，只能降低模型生成危险参数的概率，不能保证模型一定遵守。真实 LLM 仍可能因为误解、幻觉或 prompt injection 生成 `../go.mod`、绝对路径或通配符。应用层必须把模型输出当作不可信输入，遇到越权路径要直接报错拒绝，不要帮模型猜测或自动修复。当前真正执行安全边界的代码主要是：`parseFileReaderArgs()` 校验 JSON 结构和必填字段；`cleanSafeRelativePath()` 拒绝空路径、空字符、通配符、绝对路径、盘符路径、`../` 和非 `.md` / `.txt`；`SafeFileReaderTool.safePath()` 通过安全根目录、`filepath.EvalSymlinks()` 和 `filepath.Rel()` 防止 symlink 逃逸；`SafeFileReaderTool.Execute()` 限制读取大小并拒绝非 UTF-8 文本；外层 `ToolRegistry.ValidateToolCall()` 和 `validateToolResult()` 分别校验工具名和工具结果。
+
+#### Q4：为什么只检查 `../` 还不够防路径穿越？
+
+用户回答：各种限制。
+
+结论：方向正确但过于概括，需要补充具体安全点。只检查 `../` 不够，因为危险路径不只有这一种形式，还包括绝对路径、Windows 盘符路径、通配符、空字符、非允许扩展名、路径清理后的变体，以及 symlink 指向安全目录外文件。当前代码中 `cleanSafeRelativePath()` 负责拒绝明显危险路径，`SafeFileReaderTool.safePath()` 再用 `filepath.EvalSymlinks()` 和 `filepath.Rel()` 校验真实路径仍在安全根目录内。面试中不能只说“各种限制”，要能说明“限制什么、为什么限制、代码在哪里限制”。
+
+用户反馈：后续追问里的 `symlink`、`filepath.EvalSymlinks()`、`filepath.Rel()` 在课程文档中没有充分解释，不应该直接考。
+
+处理：反馈正确，该追问不计入考核。已补充 `notes/12-react-security.md` 的术语说明，新增 `symlink / 真实路径 / filepath.Rel()` 小节。后续问答必须先确保概念已在文档中解释清楚，不再突然引入未讲过的概念。
+

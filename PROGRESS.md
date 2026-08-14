@@ -117,10 +117,11 @@
 
 ### 3.4 ReAct 与安全边界
 
-- [ ] 理解 Thought / Action / Observation 的思想
-- [ ] 对危险工具增加白名单或路径限制
-- [ ] 对文件读取类工具做目录限制
-- [ ] 对工具参数做严格校验，避免模型传入危险参数
+- 本课材料已新增：`notes/12-react-security.md`。`03-agent/main.go` 已新增 `SafeFileReaderTool`、`file_reader` schema、安全目录 `03-agent/safe-files`、路径校验、扩展名限制、symlink 逃逸检测、读取大小限制和 ReAct 风格 trace。
+- [x] 理解 Thought / Action / Observation 的思想（本课使用可审计的 Action / Action Input / Observation，不暴露完整隐藏思维链）
+- [x] 对危险工具增加白名单或路径限制
+- [x] 对文件读取类工具做目录限制
+- [x] 对工具参数做严格校验，避免模型传入危险参数
 
 ### 3.5 阶段项目
 

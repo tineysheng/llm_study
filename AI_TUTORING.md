@@ -63,9 +63,9 @@ AI 应逐题提问，用户回答后先反馈正确点和不足，再继续下�
 | 阶段 3 | `tutoring/stage-3-agent.md` | Function Calling、LLM Tool Choice、工具调用、后续 Agent Loop |
 ## 当前接续点
 当前位于阶段 3：`Function Calling 与 AI Agent`。
-最新课程：`Agent Loop 基础课程记录：已完成`，详见：
+最新课程：`ReAct 与安全边界课程记录：进行中`，详见：
 - `tutoring/stage-3-agent.md`
-- `notes/11-agent-loop.md`
+- `notes/12-react-security.md`
 - `03-agent/main.go`
 - `03-agent/main_test.go`
-下一步进入阶段 3.4：`ReAct 与安全边界`。应围绕 Thought / Action / Observation 思想、危险工具白名单、文件读取目录限制、工具参数严格校验和 Agent 安全边界进行讲解、项目实现、运行观察和问答。不要重复考核已掌握的 Tool Choice 和 Agent Loop 基础问题。
+下一步应围绕 ReAct 的 Action / Action Input / Observation、为什么不暴露完整隐藏思维链、危险工具白名单、文件读取目录限制、路径穿越防护、工具参数严格校验和 Agent 安全边界进行问答。不要重复考核已掌握的 Tool Choice 和 Agent Loop 基础问题。
