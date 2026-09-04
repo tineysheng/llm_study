@@ -65,7 +65,8 @@ AI 应逐题提问，用户回答后先反馈正确点和不足，再继续下�
 | 阶段 2 | `tutoring/stage-2-rag.md` | Prompt 补课、RAG、Embedding、文档切分、向量库、RAG 链路、RAG 调优 |
 | 阶段 3 | `tutoring/stage-3-agent.md` | Function Calling、LLM Tool Choice、工具调用、后续 Agent Loop |
 ## 当前接续点
-当前阶段 3（`Function Calling 与 AI Agent`）已全线通关！
-准备进入阶段 4：`MCP 协议（Model Context Protocol）`。
+当前阶段 3（`Function Calling 与 AI Agent`）已全线通关。
+阶段 4（`MCP 协议`）已做高层概念收束：用户只需要知道 MCP 用于工具能力协议化、服务化和跨客户端复用，不再继续深入 JSON-RPC、stdio、MCP Inspector 或客户端接入细节。
 - 阶段 3 产出已沉淀在 `03-agent/`、`notes/13-personal-assistant-agent.md` 和 `tutoring/stage-3-agent.md`。
-- 下一步开启阶段 4.1：MCP 核心概念、Host/Client/Server 架构时序图与 Go 最小 MCP Server 设计。
+- 阶段 4 高层认知已沉淀在 `04-mcp/`、`notes/14-mcp-basics.md` 和 `tutoring/stage-4-mcp.md`。
+- 下一步进入阶段 5：求职作品集整理，优先打磨 RAG 项目和 Agent 项目的 README、架构图、简历表达与模拟面试说辞。

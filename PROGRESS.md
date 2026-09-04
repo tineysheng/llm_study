@@ -139,9 +139,11 @@
 
 ### 4.1 MCP 基础
 
-- [ ] 理解 Host / Client / Server 的角色
-- [ ] 理解 tools、resources、prompts 的概念
-- [ ] 对比 MCP 和 Function Calling 的区别
+- [x] 理解 Host / Client / Server 的角色（保留高层认知，不继续深挖协议细节）
+- [x] 理解 tools 的概念（resources、prompts 暂不深入）
+- [x] 对比 MCP 和 Function Calling 的区别（核心结论：工具协议化、服务化、可复用）
+
+阶段 4 收束说明：用户反馈 MCP 不想继续深入，知道它解决“工具能力标准化接入和复用”的问题即可。后续跳过 JSON-RPC、stdio、客户端接入等细节考核，转入阶段 5 作品集整理。
 
 ### 4.2 最小 MCP Server
 
